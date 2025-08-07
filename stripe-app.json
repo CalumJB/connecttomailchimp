@@ -1,0 +1,35 @@
+{
+  "id": "com.example.connecttomailchimp",
+  "version": "0.0.2",
+  "name": "Connect to Mailchimp",
+  "icon": "",
+  "permissions": [
+    {
+      "permission": "checkout_session_read",
+      "purpose": "Read Checkout Session data in webhook events"
+    }
+  ],
+  "connect_permissions": null,
+  "ui_extension": {
+    "views": [
+      {
+        "viewport": "stripe.dashboard.home.overview",
+        "component": "Home"
+      },
+      {
+        "viewport": "stripe.dashboard.customer.list",
+        "component": "Customers"
+      },
+      {
+        "viewport": "stripe.dashboard.customer.detail",
+        "component": "CustomerDetails"
+      }
+    ],
+    "content_security_policy": {
+      "connect-src": null,
+      "image-src": null,
+      "purpose": ""
+    }
+  },
+  "distribution_type": "private"
+}
