@@ -40,36 +40,7 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
     return await response.json();
   };
 
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
-const startMailchimpOAuth = async () => {
-  const signature = await fetchStripeSignature();
-
-  const response = await fetch("http://localhost:8080/api/oauth/mailchimp/start", {
-    method: "POST",
-    headers: {
-      "Stripe-Signature": signature,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      stripeUserId: userContext?.id,
-      stripeAccountId: userContext?.account?.id,
-      state: userContext?.account?.id
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to start Mailchimp OAuth flow: ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (data && data.redirectUrl) {
-    setRedirectUrl(data.redirectUrl);  // store the URL in state
-  } else {
-    throw new Error("Did not receive a redirect URL from the backend.");
-  }
-};
 
   const checkMailchimpUser = async () => {
     const signature = await fetchStripeSignature();
@@ -164,7 +135,7 @@ const startMailchimpOAuth = async () => {
     >
       <Box css={{ stack: "y", rowGap: "large" }}>
         <Button onPress={handleClick} loading={loading}>
-          Call Backend 4
+          Call Backend 5
         </Button>
 
         {error && <Inline tone="critical">Error: {error}</Inline>}
@@ -184,35 +155,27 @@ const startMailchimpOAuth = async () => {
       Here I need to show the option that will redirect the user to Mailchimp.
     </Inline>
 
-    {!redirectUrl ? (
-      <Button
-        type="primary"
-        onPress={async () => {
-          setError(null);
-          setLoading(true);
-          try {
-            await startMailchimpOAuth();
-            setLoading(false); // loading done, now show link
-          } catch (err) {
-            setError((err as Error).message);
-            setLoading(false);
-          }
-        }}
-        loading={loading}
-      >
-        Connect Mailchimp
-      </Button>
-    ) : (
-      // Show the user a link to click to continue the OAuth
-      <Link
-        href={redirectUrl}
-        target="_self" // open in same tab
-        rel="noopener noreferrer"
-        type="primary"
-      >
-        Click here to connect Mailchimp
-      </Link>
-    )}
+    <Link
+      href={(() => {
+        const clientId = "386657553310";
+        const redirectUri = "http://127.0.0.1:8080/api/oauth/mailchimp/callback";
+        const state = userContext?.account?.id || "";
+        
+        const params = new URLSearchParams({
+          response_type: "code",
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          state: state
+        });
+        
+        return `https://login.mailchimp.com/oauth2/authorize?${params.toString()}`;
+      })()}
+      target="_blank"
+      rel="noopener noreferrer"
+      type="primary"
+    >
+      Connect Mailchimp
+    </Link>
   </Box>
 )}
       </Box>
