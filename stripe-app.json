@@ -1,6 +1,6 @@
 {
-  "id": "com.example.connecttomailchimp",
-  "version": "0.0.2",
+  "id": "connecttomailchimp-demo",
+  "version": "1.0.5",
   "name": "Connect to Mailchimp",
   "icon": "",
   "permissions": [
@@ -26,9 +26,11 @@
       }
     ],
     "content_security_policy": {
-      "connect-src": null,
-      "image-src": null,
-      "purpose": ""
+      "connect-src": [
+        "https://api.connectto.app/api/"
+      ],
+      "image-src": [],
+      "purpose": "This urls allow Connect To Mailchimp to call backend server for user management and mailchimp integration."
     }
   },
   "distribution_type": "private"

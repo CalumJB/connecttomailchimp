@@ -5,13 +5,30 @@ import {
   Inline,
   Link,
   Select,
+  Banner,
+  Badge
 } from "@stripe/ui-extension-sdk/ui";
 import type { ExtensionContextValue } from "@stripe/ui-extension-sdk/context";
 import { fetchStripeSignature } from "@stripe/ui-extension-sdk/utils";
 
 
-import BrandIcon from "./brand_icon.svg";
+import BrandIcon from "./connecttostripe.svg";
 import { useState, useEffect, useCallback } from "react";
+
+const isDev = true; // REMEMBER TO CHANGE ME
+
+const getBaseUrl = () => {
+  return isDev 
+    ? "http://localhost:8080/api" // Demo url
+    : "https://api.connectto.app/api"; // Prod url
+};
+
+const getMailchimpClientId = () => {
+  return isDev 
+    ? "386657553310" // Demo client ID
+    : "556139323126"; // Production client ID
+};
+
 
 interface MailchimpAudience {
   id: string;
@@ -19,7 +36,7 @@ interface MailchimpAudience {
   member_count: number;
 }
 
-const Home = ({ userContext, environment }: ExtensionContextValue) => {
+const Home = ({ userContext }: ExtensionContextValue) => {
   const [mailchimpExists, setMailchimpExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,11 +46,13 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
   const [audiencesLoading, setAudiencesLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [audienceError, setAudienceError] = useState<string | null>(null);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
 
   const createUser = async () => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch("http://localhost:8080/api/stripe/create", {
+    const response = await fetch(`${getBaseUrl()}/stripe/create`, {
       method: "POST",
       headers: {
         "Stripe-Signature": signature,
@@ -52,12 +71,10 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
     return await response.json();
   };
 
-
-
   const checkMailchimpUser = async () => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch("http://localhost:8080/api/stripe/account/mailchimp", {
+    const response = await fetch(`${getBaseUrl()}/stripe/account/mailchimp`, {
       method: "POST",
       headers: {
         "Stripe-Signature": signature,
@@ -79,7 +96,7 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
   const fetchAudiences = useCallback(async () => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch("http://localhost:8080/api/mailchimp/user/audiences", {
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audiences`, {
       method: "POST",
       headers: {
         "Stripe-Signature": signature,
@@ -102,7 +119,7 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
   const fetchSelectedAudience = useCallback(async () => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch("http://localhost:8080/api/mailchimp/user/audience/selected", {
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/selected`, {
       method: "POST",
       headers: {
         "Stripe-Signature": signature,
@@ -125,7 +142,7 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
   const saveSelectedAudience = async (audienceId: string) => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch("http://localhost:8080/api/mailchimp/user/audience/select", {
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/select`, {
       method: "PUT",
       headers: {
         "Stripe-Signature": signature,
@@ -140,6 +157,36 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
 
     if (!response.ok) {
       throw new Error("Failed to save selected audience");
+    }
+
+    // Check if response contains JSON
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      // Return the text response if it's not JSON
+      const text = await response.text();
+      return { message: text };
+    }
+  };
+
+  const clearAudienceSelection = async () => {
+    const signature = await fetchStripeSignature();
+
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/select`, {
+      method: "DELETE",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to clear audience selection");
     }
 
     // Check if response contains JSON
@@ -173,6 +220,34 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
   }, [fetchAudiences, fetchSelectedAudience]);
 
   useEffect(() => {
+    const initializeApp = async () => {
+      setLoading(true);
+      setError(null);
+      setMailchimpExists(null);
+
+      try {
+        await createUser();
+
+        const mailchimpResponse = await checkMailchimpUser();
+
+        if (mailchimpResponse.exists) {
+          console.log(JSON.stringify(mailchimpResponse))
+          setMailchimpExists(true);
+        } else {
+          setMailchimpExists(false);
+        }
+      } catch (err) {
+        setError((err as Error).message || "Unknown error");
+      }
+
+      setLoading(false);
+    };
+
+    initializeApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userContext?.id, userContext?.account?.id]);
+
+  useEffect(() => {
     if (mailchimpExists === true) {
       loadAudienceData();
     }
@@ -183,92 +258,83 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
     try {
       await saveSelectedAudience(selectedAudienceId);
       setOriginalAudienceId(selectedAudienceId);
+      
+      // Show success notification
+      setShowSuccessNotification(true);
+      
+      // Auto-hide notification after 4 seconds
+      setTimeout(() => {
+        setShowSuccessNotification(false);
+      }, 3000);
+      
     } catch (err) {
       setError((err as Error).message || "Failed to save audience selection");
     }
     setSaveLoading(false);
   };
 
-  const handleClick = async () => {
-    setLoading(true);
-    setError(null);
-    setMailchimpExists(null);
-
-    try {
-      await createUser();
-
-      const mailchimpResponse = await checkMailchimpUser();
-
-      if (mailchimpResponse.exists) {
-        console.log(JSON.stringify(mailchimpResponse))
-        setMailchimpExists(true);
-      } else {
-        setMailchimpExists(false);
-      }
-    } catch (err) {
-      setError((err as Error).message || "Unknown error");
-    }
-
-    setLoading(false);
-  };
-
   const hasChanges = selectedAudienceId !== originalAudienceId;
 
   return (
     <ContextView
-      title="Dashboard homepage"
-      brandColor="#F6F8FA"
+      title=""
+      // brandColor="#0173E5"
       brandIcon={BrandIcon}
-      externalLink={{
-        label: "Stripe Apps docs",
-        href: "https://stripe.com/docs/stripe-apps",
-      }}
       footerContent={
         <Box css={{ marginBottom: "medium" }}>
-          Questions? Get help with your app from the{" "}
+          Something wrong?{" "}
           <Link
             external
-            href="https://stripe.com/docs/stripe-apps"
+            href="mailto:info@connectto.app"
             target="_blank"
             type="secondary"
           >
-            Stripe Apps docs
+            Contact support
           </Link>
-          ,{" "}
-          <Link
-            external
-            href="https://support.stripe.com/"
-            target="_blank"
-            type="secondary"
-          >
-            Stripe Support
-          </Link>
-          , or the{" "}
-          <Link
-            external
-            href="https://discord.com/invite/stripe"
-            target="_blank"
-            type="secondary"
-          >
-            Stripe Developers Discord
-          </Link>
-          .
         </Box>
       }
     >
-      <Box css={{ stack: "y", rowGap: "large" }}>
-        <Button onPress={handleClick} loading={loading}>
-          Call Backend 5
-        </Button>
+      {showSuccessNotification && (
+        <Box css={{ stack: "y", rowGap: "medium" }}>
+          <Banner
+            type="default"
+            title={selectedAudienceId !== "" 
+              ? "Syncing Enabled" 
+              : "Syncing Disabled"
+            }
+            onDismiss={() => setShowSuccessNotification(false)}
+          />
+        <Inline></Inline>
+        </Box>
+        )}
+      
 
+      <Box css={{ stack: "y", rowGap: "large" }}>
+        {loading && <Inline>Loading...</Inline>}
+        
         {error && <Inline tone="critical">Error: {error}</Inline>}
+        
+        
 
         {mailchimpExists === true && (
           <Box css={{ stack: "y", rowGap: "medium" }}>
-            <Inline>
-              Mailchimp user exists! Select your audience below:
+            <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
+              Checkout Session
             </Inline>
             
+            {!audiencesLoading && (
+              originalAudienceId !== "" ? (
+                <Badge type="positive">Enabled</Badge>
+              ) : (
+                <Inline css={{ color: "critical"}}>
+                  <Badge type="negative">Disabled</Badge>
+                </Inline>
+              )
+            )}
+            
+            <Inline>
+              When a new customer completes a Checkout Session their email will be added to the Mailchimp Audience with tag &apos;stripe&apos;.
+            </Inline>
             {audiencesLoading ? (
               <Inline>Loading audiences...</Inline>
             ) : audienceError ? (
@@ -301,22 +367,87 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
                   value={selectedAudienceId}
                   onChange={(event) => setSelectedAudienceId(event.target.value)}
                 >
-                  {originalAudienceId === "" && <option value="">-- Select an audience --</option>}
+                  <option value="">-- Select an audience --</option>
                   {audiences.map((audience) => (
                     <option key={audience.id} value={audience.id}>
                       {audience.name} ({audience.member_count} members)
                     </option>
                   ))}
                 </Select>
-                
-                <Button 
-                  onPress={handleSave} 
-                  loading={saveLoading}
-                  disabled={!hasChanges}
-                  type="primary"
-                >
-                  Save Selection
-                </Button>
+                <Box css={{ stack: "y", rowGap: "medium" }}>
+                  <Box>
+                  <Button 
+                      onPress={handleSave} 
+                      loading={saveLoading}
+                      disabled={!hasChanges}
+                      type="primary"
+                    >
+                      Save Selection
+                    </Button>
+                  </Box>
+                  <Box>
+                  {originalAudienceId !== "" && !showConfirmClear && (
+                      <Button
+                        onPress={() => setShowConfirmClear(true)}
+                        loading={saveLoading}
+                        type="destructive"
+                      >
+                        Disable
+                      </Button>
+                    )}
+                  </Box>
+                    
+                    
+                    
+                  
+                  {showConfirmClear && (
+                    <Box css={{ stack: "y", rowGap: "small", padding: "medium", background: "container" }}>
+                      <Inline css={{ fontWeight: "semibold" }}>
+                        Are you sure you want to disabled?
+                      </Inline>
+                      <Inline>
+                        This will stop syncing customer emails to Mailchimp.
+                      </Inline>
+                        <Box>
+                        <Button 
+                          onPress={async () => {
+                            setSaveLoading(true);
+                            try {
+                              await clearAudienceSelection();
+                              setSelectedAudienceId("");
+                              setOriginalAudienceId("");
+                              setShowConfirmClear(false);
+                              
+                              // Show success notification
+                              setShowSuccessNotification(true);
+                              setTimeout(() => {
+                                setShowSuccessNotification(false);
+                              }, 3000);
+                              
+                            } catch (err) {
+                              setError((err as Error).message || "Failed to clear audience selection");
+                            }
+                            setSaveLoading(false);
+                          }}
+                          loading={saveLoading}
+                          type="destructive"
+                          size="small"
+                        >
+                          Confirm
+                        </Button>
+                        </Box>
+                        <Box>
+                        <Button 
+                          onPress={() => setShowConfirmClear(false)}
+                          type="secondary"
+                          size="small"
+                        >
+                          Cancel
+                        </Button>
+                        </Box>
+                    </Box>
+                  )}
+                </Box>
               </>
             )}
           </Box>
@@ -324,14 +455,20 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
 
 {mailchimpExists === false && (
   <Box css={{ stack: "y", rowGap: "medium" }}>
-    <Inline>
-      Here I need to show the option that will redirect the user to Mailchimp.
-    </Inline>
+    <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
+Welcome
+</Inline>
+<Inline>
+Connect your Mailchimp account and we&apos;ll start syncing your Stripe customers automatically.
+</Inline>
+<Inline/>
 
-    <Link
+
+
+    <Button
       href={(() => {
-        const clientId = "386657553310";
-        const redirectUri = "http://127.0.0.1:8080/api/oauth/mailchimp/callback";
+        const clientId = getMailchimpClientId();
+        const redirectUri = `${getBaseUrl()}/oauth/mailchimp/callback`;
         const state = userContext?.account?.id || "";
         
         const params = new URLSearchParams({
@@ -344,11 +481,13 @@ const Home = ({ userContext, environment }: ExtensionContextValue) => {
         return `https://login.mailchimp.com/oauth2/authorize?${params.toString()}`;
       })()}
       target="_blank"
-      rel="noopener noreferrer"
       type="primary"
+      css={{
+        width: "fill",
+      }}
     >
-      Connect Mailchimp
-    </Link>
+      Connect to Mailchimp ↗
+    </Button>
   </Box>
 )}
       </Box>
