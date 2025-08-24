@@ -2,7 +2,7 @@
   "id": "connecttomailchimp-demo",
   "version": "1.0.5",
   "name": "Connect to Mailchimp",
-  "icon": "",
+  "icon": "src/views/icon.png",
   "permissions": [
     {
       "permission": "checkout_session_read",
@@ -15,14 +15,6 @@
       {
         "viewport": "stripe.dashboard.home.overview",
         "component": "Home"
-      },
-      {
-        "viewport": "stripe.dashboard.customer.list",
-        "component": "Customers"
-      },
-      {
-        "viewport": "stripe.dashboard.customer.detail",
-        "component": "CustomerDetails"
       }
     ],
     "content_security_policy": {

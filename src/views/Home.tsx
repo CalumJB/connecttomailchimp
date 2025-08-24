@@ -6,7 +6,8 @@ import {
   Link,
   Select,
   Banner,
-  Badge
+  Badge,
+  Icon
 } from "@stripe/ui-extension-sdk/ui";
 import type { ExtensionContextValue } from "@stripe/ui-extension-sdk/context";
 import { fetchStripeSignature } from "@stripe/ui-extension-sdk/utils";
@@ -45,11 +46,26 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   const [originalAudienceId, setOriginalAudienceId] = useState<string>("");
   const [audiencesLoading, setAudiencesLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [audienceError, setAudienceError] = useState<string | null>(null);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
+  const [disconnectLoading, setDisconnectLoading] = useState(false);
+  const [showManageSection, setShowManageSection] = useState(false);
+  const [showReloadButton, setShowReloadButton] = useState(false);
+
+  const handleApiError = async (response: Response, fallbackMessage: string) => {
+    if (!response.ok) {
+      const errorText = await response.text();
+      if ((response.status === 401 || response.status === 403) && 
+          (errorText.toLowerCase().includes('mailchimp'))) {
+        throw new Error("There's an issue with your Mailchimp account. You may need to reconnect your Mailchimp account.");
+      }
+      throw new Error(fallbackMessage);
+    }
+  };
 
   const createUser = async () => {
+    setError(null); // Clear any previous errors
     const signature = await fetchStripeSignature();
 
     const response = await fetch(`${getBaseUrl()}/stripe/create`, {
@@ -64,14 +80,13 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to create user");
-    }
+    await handleApiError(response, "Failed to create user");
 
     return await response.json();
   };
 
   const checkMailchimpUser = async () => {
+    setError(null); // Clear any previous errors
     const signature = await fetchStripeSignature();
 
     const response = await fetch(`${getBaseUrl()}/stripe/account/mailchimp`, {
@@ -86,9 +101,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch Mailchimp user");
-    }
+    await handleApiError(response, "Failed to fetch Mailchimp user");
 
     return await response.json();
   };
@@ -108,9 +121,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch audiences");
-    }
+    await handleApiError(response, "Failed to fetch audiences");
 
     const data = await response.json();
     return data.lists || [];
@@ -131,15 +142,14 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch selected audience");
-    }
+    await handleApiError(response, "Failed to fetch selected audience");
 
     const data = await response.json();
     return data.selected_audience_id || "";
   }, [userContext?.id, userContext?.account?.id]);
 
   const saveSelectedAudience = async (audienceId: string) => {
+    setError(null); // Clear any previous errors
     const signature = await fetchStripeSignature();
 
     const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/select`, {
@@ -155,9 +165,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to save selected audience");
-    }
+    await handleApiError(response, "Failed to save selected audience");
 
     // Check if response contains JSON
     const contentType = response.headers.get("content-type");
@@ -171,6 +179,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   };
 
   const clearAudienceSelection = async () => {
+    setError(null); // Clear any previous errors
     const signature = await fetchStripeSignature();
 
     const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/select`, {
@@ -185,9 +194,36 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to clear audience selection");
+    await handleApiError(response, "Failed to clear audience selection");
+
+    // Check if response contains JSON
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      // Return the text response if it's not JSON
+      const text = await response.text();
+      return { message: text };
     }
+  };
+
+  const disconnectMailchimp = async () => {
+    setError(null); // Clear any previous errors
+    const signature = await fetchStripeSignature();
+
+    const response = await fetch(`${getBaseUrl()}/oauth/mailchimp/disconnect`, {
+      method: "DELETE",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    await handleApiError(response, "Failed to disconnect Mailchimp");
 
     // Check if response contains JSON
     const contentType = response.headers.get("content-type");
@@ -202,7 +238,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
 
   const loadAudienceData = useCallback(async () => {
     setAudiencesLoading(true);
-    setAudienceError(null);
+    setError(null); // Clear any previous errors
     try {
       const [audiencesData, selectedId] = await Promise.all([
         fetchAudiences(),
@@ -214,7 +250,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       setOriginalAudienceId(selectedId);
     } catch (err) {
       console.error("Failed to load audience data:", err);
-      setAudienceError((err as Error).message || "Failed to load audience data");
+      setError((err as Error).message || "Failed to load audience data");
     }
     setAudiencesLoading(false);
   }, [fetchAudiences, fetchSelectedAudience]);
@@ -277,7 +313,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
 
   return (
     <ContextView
-      title=""
+      title="Connect to Mailchimp"
       // brandColor="#0173E5"
       brandIcon={BrandIcon}
       footerContent={
@@ -318,6 +354,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
 
         {mailchimpExists === true && (
           <Box css={{ stack: "y", rowGap: "medium" }}>
+            <Box css={{ stack: "x", rowGap: "medium", distribute: "space-between", alignY: "center" }}>
             <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
               Checkout Session
             </Inline>
@@ -331,21 +368,13 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                 </Inline>
               )
             )}
+            </Box>
             
             <Inline>
               When a new customer completes a Checkout Session their email will be added to the Mailchimp Audience with tag &apos;stripe&apos;.
             </Inline>
             {audiencesLoading ? (
               <Inline>Loading audiences...</Inline>
-            ) : audienceError ? (
-              <Box css={{ stack: "y", rowGap: "small" }}>
-                <Inline tone="critical">
-                  Error loading audiences: {audienceError}
-                </Inline>
-                <Button onPress={loadAudienceData} type="secondary" size="small">
-                  Try Again
-                </Button>
-              </Box>
             ) : audiences.length === 0 ? (
               <Box css={{ stack: "y", rowGap: "small" }}>
                 <Inline tone="neutral">
@@ -362,44 +391,50 @@ const Home = ({ userContext }: ExtensionContextValue) => {
               </Box>
             ) : (
               <>
-                <Select
-                  label="Select Mailchimp Audience"
-                  value={selectedAudienceId}
-                  onChange={(event) => setSelectedAudienceId(event.target.value)}
-                >
-                  <option value="">-- Select an audience --</option>
-                  {audiences.map((audience) => (
-                    <option key={audience.id} value={audience.id}>
-                      {audience.name} ({audience.member_count} members)
-                    </option>
-                  ))}
-                </Select>
-                <Box css={{ stack: "y", rowGap: "medium" }}>
-                  <Box>
+                <Box css={{ stack: "y", rowGap: "small" }}>
+                  <Inline css={{font: 'body', color: 'primary', fontWeight: "semibold"}}>Select Audience</Inline>
+                <Box css={{ stack: "x", columnGap: "small"}}>
+                  <Select
+                    value={selectedAudienceId}
+                    onChange={(event) => setSelectedAudienceId(event.target.value)}
+                  >
+                    <option value="">-- Select an audience --</option>
+                    {audiences.map((audience) => (
+                      <option key={audience.id} value={audience.id}>
+                        {audience.name} ({audience.member_count} members)
+                      </option>
+                    ))}
+                  </Select>
                   <Button 
-                      onPress={handleSave} 
-                      loading={saveLoading}
-                      disabled={!hasChanges}
-                      type="primary"
+                      onPress={loadAudienceData}
+                      loading={audiencesLoading}
+                      type="secondary"
+                      size="medium"
                     >
-                      Save Selection
+                      <Icon name="refresh"/>
                     </Button>
-                  </Box>
-                  <Box>
+                </Box>
+                </Box>
+                <Box css={{ stack: "y", rowGap: "medium" }}>
+                <Box css={{ stack: "x", columnGap: "medium" }}>
+                  <Button 
+                    onPress={handleSave} 
+                    loading={saveLoading}
+                    disabled={!hasChanges}
+                    type="primary"
+                  >
+                    Save Selection
+                  </Button>
                   {originalAudienceId !== "" && !showConfirmClear && (
-                      <Button
-                        onPress={() => setShowConfirmClear(true)}
-                        loading={saveLoading}
-                        type="destructive"
-                      >
-                        Disable
-                      </Button>
-                    )}
-                  </Box>
-                    
-                    
-                    
-                  
+                    <Button
+                      onPress={() => setShowConfirmClear(true)}
+                      loading={saveLoading}
+                      type="destructive"
+                    >
+                      Disable
+                    </Button>
+                  )}
+                </Box>
                   {showConfirmClear && (
                     <Box css={{ stack: "y", rowGap: "small", padding: "medium", background: "container" }}>
                       <Inline css={{ fontWeight: "semibold" }}>
@@ -465,29 +500,145 @@ Connect your Mailchimp account and we&apos;ll start syncing your Stripe customer
 
 
 
-    <Button
-      href={(() => {
-        const clientId = getMailchimpClientId();
-        const redirectUri = `${getBaseUrl()}/oauth/mailchimp/callback`;
-        const state = userContext?.account?.id || "";
+    {!showReloadButton ? (
+      <Button
+        href={(() => {
+          const clientId = getMailchimpClientId();
+          const redirectUri = `${getBaseUrl()}/oauth/mailchimp/callback`;
+          const state = userContext?.account?.id || "";
+          
+          const params = new URLSearchParams({
+            response_type: "code",
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            state: state
+          });
+          
+          return `https://login.mailchimp.com/oauth2/authorize?${params.toString()}`;
+        })()}
+        target="_blank"
+        type="primary"
+        onPress={() => setShowReloadButton(true)}
+        css={{
+          width: "fill",
+        }}
+      >
+        Connect to Mailchimp
+        <Icon name="external"/>
+      </Button>
+    ) : (
+      <Button
+        onPress={async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            const mailchimpResponse = await checkMailchimpUser();
+            if (mailchimpResponse.exists) {
+              setMailchimpExists(true);
+            } else {
+              setMailchimpExists(false);
+            }
+            setShowReloadButton(false);
+          } catch (err) {
+            setError((err as Error).message || "Unknown error");
+          }
+          setLoading(false);
+        }}
+        loading={loading}
+        type="primary"
+        css={{
+          width: "fill",
+        }}
+      >
+        Reload
+      </Button>
+    )}
+  </Box>
+)}
+
+{mailchimpExists === true && (
+  <Box css={{ stack: "y", rowGap: "medium" }}>
+    <Box css={{ stack: "y", rowGap: "medium"}}>
+      <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
+        Manage Mailchimp
+      </Inline>
+      <Button 
+        onPress={() => setShowManageSection(!showManageSection)}
+        type="secondary"
+        size="medium"
+      >
+        {showManageSection ? 'Hide' : 'Show' }
+      </Button>
+    </Box>
+    
+    {showManageSection && (
+      <Box css={{ stack: "y", rowGap: "medium" }}>
+        <Inline>
+          Disconnect your Mailchimp account to stop all syncing and remove the integration.
+        </Inline>
+
+        <Box css={{ stack: "x", columnGap: "medium" }}>
+          {!showConfirmDisconnect && (
+            <Button 
+              onPress={() => setShowConfirmDisconnect(true)}
+              loading={disconnectLoading}
+              type="destructive"
+              size="medium"
+            >
+              Disconnect Mailchimp
+            </Button>
+          )}
+        </Box>
         
-        const params = new URLSearchParams({
-          response_type: "code",
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          state: state
-        });
-        
-        return `https://login.mailchimp.com/oauth2/authorize?${params.toString()}`;
-      })()}
-      target="_blank"
-      type="primary"
-      css={{
-        width: "fill",
-      }}
-    >
-      Connect to Mailchimp ↗
-    </Button>
+        {showConfirmDisconnect && (
+          <Box css={{ stack: "y", rowGap: "small", padding: "medium", background: "container" }}>
+            <Inline css={{ fontWeight: "semibold" }}>
+              Are you sure you want to disconnect Mailchimp?
+            </Inline>
+            <Inline>
+              This will permanently remove the integration and stop all email syncing. You will need to reconnect if you want to use this service again.
+            </Inline>
+            <Box css={{ stack: "x", columnGap: "medium" }}>
+              <Button 
+                onPress={async () => {
+                  setDisconnectLoading(true);
+                  try {
+                    await disconnectMailchimp();
+                    setShowConfirmDisconnect(false);
+                    setMailchimpExists(false);
+                    setSelectedAudienceId("");
+                    setOriginalAudienceId("");
+                    setAudiences([]);
+                    
+                    // Show success notification
+                    setShowSuccessNotification(true);
+                    setTimeout(() => {
+                      setShowSuccessNotification(false);
+                    }, 3000);
+                    
+                  } catch (err) {
+                    setError((err as Error).message || "Failed to disconnect Mailchimp");
+                  }
+                  setDisconnectLoading(false);
+                }}
+                loading={disconnectLoading}
+                type="destructive"
+                size="small"
+              >
+                Yes, Disconnect
+              </Button>
+              <Button 
+                onPress={() => setShowConfirmDisconnect(false)}
+                type="secondary"
+                size="small"
+              >
+                Cancel
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Box>
+    )}
   </Box>
 )}
       </Box>
