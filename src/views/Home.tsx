@@ -9,6 +9,7 @@ import {
   Badge,
   Icon
 } from "@stripe/ui-extension-sdk/ui";
+import React from 'react'
 import type { ExtensionContextValue } from "@stripe/ui-extension-sdk/context";
 import { fetchStripeSignature } from "@stripe/ui-extension-sdk/utils";
 
@@ -30,11 +31,26 @@ const getMailchimpClientId = () => {
     : "556139323126"; // Production client ID
 };
 
+const getPricingPage = () => {
+  return isDev
+  ? "https://www.connectto.app/demo-pricing"
+  : "'"
+}
+
 
 interface MailchimpAudience {
   id: string;
   name: string;
   member_count: number;
+}
+
+interface PlanInfo {
+  planName: string;
+  planDisplayName: string;
+  monthlySyncLimit: number;
+  currentMonthUsage: number;
+  remainingSyncs: number;
+  status: string;
 }
 
 const Home = ({ userContext }: ExtensionContextValue) => {
@@ -52,6 +68,8 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   const [disconnectLoading, setDisconnectLoading] = useState(false);
   const [showManageSection, setShowManageSection] = useState(false);
   const [showReloadButton, setShowReloadButton] = useState(false);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
 
   const handleApiError = async (response: Response, fallbackMessage: string) => {
     if (!response.ok) {
@@ -207,6 +225,27 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     }
   };
 
+  const fetchPlanInfo = async () => {
+    setError(null);
+    const signature = await fetchStripeSignature();
+
+    const response = await fetch(`${getBaseUrl()}/user/plan-info`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    await handleApiError(response, "Failed to fetch plan info");
+
+    return await response.json();
+  };
+
   const disconnectMailchimp = async () => {
     setError(null); // Clear any previous errors
     const signature = await fetchStripeSignature();
@@ -264,13 +303,23 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       try {
         await createUser();
 
-        const mailchimpResponse = await checkMailchimpUser();
+        const [mailchimpResponse, planData] = await Promise.all([
+          checkMailchimpUser(),
+          fetchPlanInfo().catch(err => {
+            console.error("Failed to fetch plan info:", err);
+            return null;
+          })
+        ]);
 
         if (mailchimpResponse.exists) {
           console.log(JSON.stringify(mailchimpResponse))
           setMailchimpExists(true);
         } else {
           setMailchimpExists(false);
+        }
+
+        if (planData) {
+          setPlanInfo(planData);
         }
       } catch (err) {
         setError((err as Error).message || "Unknown error");
@@ -340,15 +389,95 @@ const Home = ({ userContext }: ExtensionContextValue) => {
             }
             onDismiss={() => setShowSuccessNotification(false)}
           />
-        <Inline></Inline>
         </Box>
         )}
       
 
       <Box css={{ stack: "y", rowGap: "large" }}>
+        
+
         {loading && <Inline>Loading...</Inline>}
         
-        {error && <Inline tone="critical">Error: {error}</Inline>}
+        {error && <Inline>Error: {error}</Inline>}
+
+
+        {planInfo && (
+          <Box css={{ 
+            stack: "y", 
+            rowGap: "medium", 
+            padding: "large",
+            background: planInfo.planName === "free" ? "surface" : "container",
+            borderRadius: "medium"
+          }}>
+
+            {planInfo.planName === "FREE" && (
+              <Box css={{ stack: "y", rowGap: "small" }}>
+                <Inline css={{ fontWeight: 'semibold'}}>
+                  Welcome!
+                </Inline>
+                <Inline>
+                  We’ve given you 20 free syncs this month so you can explore the app.
+                </Inline>
+                <Inline>
+                  Subscribe anytime to unlock more syncs and keep your data flowing.
+                </Inline>
+                <Box css={{paddingTop: "small"}}>
+                <Button 
+                  href={`${getPricingPage()}?stripe_account_id=${userContext?.account?.id}`}
+                  target="_blank"
+                  type="primary"
+                  size="medium"
+                  css={{width: "fill"}}
+                >
+                  Upgrade Now
+                  <Icon name="external"/>
+                </Button>
+                </Box>                
+              </Box>
+
+            )}
+
+            </Box>
+        )}
+
+        {planInfo && (
+          <Box css={{ 
+            stack: "y", 
+            rowGap: "medium", 
+            padding: "large",
+            background: planInfo.planName === "free" ? "surface" : "container",
+            borderRadius: "medium"
+          }}>
+
+              <Box css={{ stack: "y", rowGap: "small" }}>
+                <Box css={{ stack: "x", distribute: "space-between" }}>
+                  <Inline>
+                    {planInfo.currentMonthUsage} / {planInfo.monthlySyncLimit} syncs used
+                  </Inline>
+                  <Inline>
+                    {planInfo.remainingSyncs} remaining
+                  </Inline>
+                </Box>
+              </Box>
+
+            {planInfo.planName !== "FREE" && (
+              <Box css={{ stack: "y", rowGap: "small" }}>
+                <Inline>
+                  Upgrade to Pro for unlimited syncs and premium features.
+                </Inline>
+                <Button 
+                  href={`${getPricingPage()}?stripe_account_id=${userContext?.account?.id}`}
+                  target="_blank"
+                  type="primary"
+                  size="medium"
+                >
+                  Subscribe Now
+                  <Icon name="external"/>
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
         
         
 
