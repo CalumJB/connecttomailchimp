@@ -70,6 +70,8 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   const [showReloadButton, setShowReloadButton] = useState(false);
   const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [customerPortalUrl, setCustomerPortalUrl] = useState<string | null>(null);
+  const [customerPortalLoading, setCustomerPortalLoading] = useState(false);
 
   const handleApiError = async (response: Response, fallbackMessage: string) => {
     if (!response.ok) {
@@ -246,6 +248,35 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     return await response.json();
   };
 
+  const fetchCustomerPortalUrl = async () => {
+    setError(null);
+    setCustomerPortalLoading(true);
+    const signature = await fetchStripeSignature();
+
+    try {
+      const response = await fetch(`${getBaseUrl()}/user/customer-portal`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to fetch customer portal URL");
+
+      const data = await response.json();
+      setCustomerPortalUrl(data.url);
+    } catch (err) {
+      setError((err as Error).message || "Failed to fetch customer portal URL");
+    } finally {
+      setCustomerPortalLoading(false);
+    }
+  };
+
   const disconnectMailchimp = async () => {
     setError(null); // Clear any previous errors
     const signature = await fetchStripeSignature();
@@ -398,6 +429,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
 
         {loading && <Inline>Loading...</Inline>}
         
+        
         {error && <Inline>Error: {error}</Inline>}
 
 
@@ -424,13 +456,11 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                 <Box css={{paddingTop: "small"}}>
                 <Button 
                   href={`${getPricingPage()}?stripe_account_id=${userContext?.account?.id}`}
-                  target="_blank"
                   type="primary"
                   size="medium"
                   css={{width: "fill"}}
                 >
                   Upgrade Now
-                  <Icon name="external"/>
                 </Button>
                 </Box>                
               </Box>
@@ -467,18 +497,60 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                 </Inline>
                 <Button 
                   href={`${getPricingPage()}?stripe_account_id=${userContext?.account?.id}`}
-                  target="_blank"
                   type="primary"
                   size="medium"
                 >
-                  Subscribe Now
+                  Upgrade Now
                   <Icon name="external"/>
                 </Button>
               </Box>
             )}
           </Box>
         )}
-        
+
+        {planInfo && planInfo.planName !== "FREE" && (
+          <Box css={{ 
+            stack: "y", 
+            rowGap: "medium", 
+            padding: "large",
+            background: "surface",
+            borderRadius: "medium"
+          }}>
+            <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
+              Manage Subscription
+            </Inline>
+            
+            <Inline>
+              Access your billing history, update payment methods, and manage your subscription.
+            </Inline>
+
+            {!customerPortalUrl ? (
+              <Button 
+                onPress={fetchCustomerPortalUrl}
+                loading={customerPortalLoading}
+                type="secondary"
+                size="medium"
+              >
+                Get Management Link
+              </Button>
+            ) : (
+              <Box css={{ stack: "y", rowGap: "small" }}>
+                <Inline tone="positive">
+                  Management link ready! Click below to open your customer portal.
+                </Inline>
+                <Button 
+                  href={customerPortalUrl}
+                  type="primary"
+                  size="medium"
+                  css={{width: "fill"}}
+                >
+                  Open Customer Portal
+                  <Icon name="external"/>
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
         
 
         {mailchimpExists === true && (
@@ -645,7 +717,6 @@ Connect your Mailchimp account and we&apos;ll start syncing your Stripe customer
           
           return `https://login.mailchimp.com/oauth2/authorize?${params.toString()}`;
         })()}
-        target="_blank"
         type="primary"
         onPress={() => setShowReloadButton(true)}
         css={{
@@ -653,7 +724,6 @@ Connect your Mailchimp account and we&apos;ll start syncing your Stripe customer
         }}
       >
         Connect to Mailchimp
-        <Icon name="external"/>
       </Button>
     ) : (
       <Button
