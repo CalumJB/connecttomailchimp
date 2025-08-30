@@ -33,10 +33,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       }}>
         <Box css={{ stack: "y", rowGap: "small" }}>
           <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-            Checkout Session
+            Manage Syncing
           </Inline>
           <Inline css={{ font: 'caption' }}>
-            Sync new customers to your Mailchimp Audience
+            Add or update your target Audience
           </Inline>
         </Box>
         <Button
@@ -87,7 +87,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       }}>
         <Box css={{ stack: "y", rowGap: "small" }}>
           <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-            Manage Mailchimp
+            Manage Connection
           </Inline>
           <Inline css={{ font: 'caption' }}>
             Disconnect or manage your Mailchimp integration

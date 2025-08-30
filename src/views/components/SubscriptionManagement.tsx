@@ -6,14 +6,23 @@ import {
   Icon
 } from "@stripe/ui-extension-sdk/ui";
 
+interface PlanInfo {
+  planName: string;
+  planDisplayName: string;
+  monthlySyncLimit: number;
+  currentMonthUsage: number;
+  remainingSyncs: number;
+  status: string;
+}
+
 interface SubscriptionManagementProps {
-  planName: string | undefined;
+  planInfo: PlanInfo | null;
   onFetchPortalUrl: () => Promise<string>;
   onError: (error: string) => void;
 }
 
 export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
-  planName,
+  planInfo,
   onFetchPortalUrl,
   onError
 }) => {
@@ -32,23 +41,41 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
     }
   };
 
-  if (!planName || planName === "FREE") return null;
-
   return (
-    <Box css={{ 
-      stack: "y", 
-      rowGap: "medium", 
-      // padding: "large",
-      background: "surface",
-      borderRadius: "medium"
-    }}>
-      <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
-        Manage Subscription
-      </Inline>
-      
-      <Inline>
-        Access your billing history, update payment methods, and manage your subscription.
-      </Inline>
+    <Box css={{ stack: "y", rowGap: "medium" }}>
+      {planInfo && (
+        <Box css={{
+          padding: "medium",
+          background: "container",
+          borderRadius: "medium"
+        }}>
+          <Box css={{ stack: "y", rowGap: "small" }}>
+            <Inline css={{ fontWeight: 'semibold' }}>
+              Current Plan: {planInfo.planDisplayName}
+            </Inline>
+            <Inline css={{ font: 'body' }}>
+              Sync Limit: {planInfo.monthlySyncLimit === -1 ? 'Unlimited' : planInfo.monthlySyncLimit} syncs per month
+            </Inline>
+          </Box>
+        </Box>
+      )}
+
+      <Box css={{
+        stack: "y",
+        rowGap: "medium",
+        distribute: "space-between",
+        alignY: "center",
+        padding: "medium",
+        background: "container",
+        borderRadius: "medium"
+      }}>
+        <Inline css={{color: 'primary', fontWeight: 'semibold'}}>
+          Manage Subscription
+        </Inline>
+        
+        <Inline>
+          Access your billing history, update payment methods, and manage your subscription.
+        </Inline>
 
       {!customerPortalUrl ? (
         <Button 
@@ -74,6 +101,7 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
           </Button>
         </Box>
       )}
+      </Box>
     </Box>
   );
 };

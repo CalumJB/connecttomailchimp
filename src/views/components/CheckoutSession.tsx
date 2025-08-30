@@ -92,21 +92,19 @@ export const CheckoutSession: React.FC<CheckoutSessionProps> = ({
   const hasChanges = selectedAudienceId !== originalAudienceId;
 
   return (
-    <Box css={{ stack: "y", rowGap: "medium" }}>
+    <Box css={{
+      stack: "y",
+      rowGap: "medium",
+      distribute: "space-between",
+      alignY: "center",
+      padding: "medium",
+      background: "container",
+      borderRadius: "medium"
+    }}>
       <Box css={{ stack: "x", rowGap: "medium", distribute: "space-between", alignY: "center" }}>
-        <Inline css={{font: 'heading', color: 'primary', fontWeight: 'semibold'}}>
-          Checkout Session
+        <Inline css={{ color: 'primary', fontWeight: 'semibold'}}>
+          Select your Audience
         </Inline>
-        
-        {!audiencesLoading && (
-          originalAudienceId !== "" ? (
-            <Badge type="positive">Enabled</Badge>
-          ) : (
-            <Inline css={{ color: "critical"}}>
-              <Badge type="negative">Disabled</Badge>
-            </Inline>
-          )
-        )}
       </Box>
       
       <Inline>

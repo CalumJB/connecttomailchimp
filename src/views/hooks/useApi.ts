@@ -264,6 +264,78 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
     return `${getPricingPage()}?stripe_account_id=${accountId}`;
   };
 
+  const completeOnboarding = async () => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/mailchimp/onboarding/complete`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response, "Failed to mark onboarding as complete");
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      const text = await response.text();
+      return { message: text };
+    }
+  };
+
+  const checkOnboardingStatus = async () => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/mailchimp/onboarding/is-completed`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response, "Failed to check onboarding status");
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      const result = await response.text();
+      return { completed: result === "true" };
+    }
+  };
+
+  const fetchUsage = async () => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/user/usage`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    await handleApiError(response, "Failed to fetch usage data");
+    return await response.json();
+  };
+
   return {
     loading,
     error,
@@ -280,5 +352,8 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
     disconnectMailchimp,
     getMailchimpAuthUrl,
     getPricingPageUrl,
+    completeOnboarding,
+    checkOnboardingStatus,
+    fetchUsage,
   };
 };

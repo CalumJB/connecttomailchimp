@@ -33,20 +33,20 @@ export const UsageSection: React.FC<UsageSectionProps> = ({
       stack: "y", 
       rowGap: "small", 
     }} >
-      {planInfo.planName === "FREE" && (
+  
         <Box css={{ 
           stack: "y", 
-          rowGap: "medium", 
-          padding: "large",
+          rowGap: "small", 
+          padding: "medium",
           background: "container",
-          borderRadius: "small"
+          borderRadius: "medium"
         }}>
     
           <Inline>
-            You&apos;re currently on the free tier that allows 20 events per month.
+            You only have {planInfo.remainingSyncs} syncs remaining.
           </Inline>
-          <Inline>
-            Subscribe to increase your allowance and keep your data flowing.
+          <Inline css={{ fontWeight: "bold"}}>
+            Get 1000 syncs for $10 per month.
           </Inline>
           <Button 
             href={getPricingPageUrl(accountId)}
@@ -58,26 +58,7 @@ export const UsageSection: React.FC<UsageSectionProps> = ({
             <Icon name="external"/>
           </Button>
         </Box>
-      )}
-    
-    <Box css={{ 
-      stack: "y", 
-      rowGap: "medium", 
-      padding: "large",
-      background: planInfo.planName === "free" ? "surface" : "container",
-      borderRadius: "medium"
-    }}>
-      <Box css={{ stack: "y", rowGap: "small" }}>
-        <Box css={{ stack: "x", distribute: "space-between" }}>
-          <Inline>
-            {planInfo.currentMonthUsage} / {planInfo.monthlySyncLimit} syncs used
-          </Inline>
-          <Inline>
-            {planInfo.remainingSyncs} remaining
-          </Inline>
-        </Box>
-      </Box>
-    </Box>
+     
     </Box>
     
   );
