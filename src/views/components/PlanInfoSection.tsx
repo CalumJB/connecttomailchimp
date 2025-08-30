@@ -66,7 +66,7 @@ export const PlanInfoSection: React.FC<PlanInfoSectionProps> = ({
               css={{width: "fill"}}
               onPress={onContinueFree}
             >
-              Continue Free
+              Continue
             </Button>
           </Box>                
         </Box>
