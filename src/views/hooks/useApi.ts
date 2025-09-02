@@ -132,7 +132,7 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   const fetchAudiences = async (): Promise<MailchimpAudience[]> => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audiences`, {
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audiences`, {
       method: "POST",
       headers: {
         "Stripe-Signature": signature,
@@ -152,7 +152,7 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   const fetchSelectedAudience = async (): Promise<string> => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/selected`, {
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/get`, {
       method: "POST",
       headers: {
         "Stripe-Signature": signature,
@@ -172,8 +172,8 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   const saveSelectedAudience = async (audienceId: string) => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/select`, {
-      method: "PUT",
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/post`, {
+      method: "POST",
       headers: {
         "Stripe-Signature": signature,
         "Content-Type": "application/json",
@@ -198,7 +198,7 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   const clearAudienceSelection = async () => {
     const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/checkout/audience/select`, {
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/delete`, {
       method: "DELETE",
       headers: {
         "Stripe-Signature": signature,
@@ -336,6 +336,61 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
     return await response.json();
   };
 
+  const getAudienceStatus = async () => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/get`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    await handleApiError(response, "Failed to fetch audience status");
+    return await response.json();
+  };
+
+  const setAudienceStatus = async (status: string) => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/post`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+        audience_status: status,
+      }),
+    });
+
+    await handleApiError(response, "Failed to set audience status");
+    return await response.json();
+  };
+
+  const getPendingContacts = async () => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/get-pending-contacts`, {
+      method: "POST",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    await handleApiError(response, "Failed to get pending contacts");
+    return await response.json();
+  };
+
   return {
     loading,
     error,
@@ -355,5 +410,8 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
     completeOnboarding,
     checkOnboardingStatus,
     fetchUsage,
+    getAudienceStatus,
+    setAudienceStatus,
+    getPendingContacts,
   };
 };

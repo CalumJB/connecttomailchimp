@@ -39,27 +39,27 @@ export const CheckoutSession: React.FC<CheckoutSessionProps> = ({
   const [saveLoading, setSaveLoading] = useState(false);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
 
-  const loadAudienceData = useCallback(async () => {
-    setAudiencesLoading(true);
-    try {
-      const [audiencesData, selectedId] = await Promise.all([
-        onFetchAudiences(),
-        onFetchSelectedAudience()
-      ]);
-      
-      setAudiences(audiencesData);
-      setSelectedAudienceId(selectedId);
-      setOriginalAudienceId(selectedId);
-    } catch (err) {
-      onError((err as Error).message || "Failed to load audience data");
-    } finally {
-      setAudiencesLoading(false);
-    }
-  }, [onFetchAudiences, onFetchSelectedAudience, onError]);
-
   useEffect(() => {
+    const loadAudienceData = async () => {
+      setAudiencesLoading(true);
+      try {
+        const [audiencesData, selectedId] = await Promise.all([
+          onFetchAudiences(),
+          onFetchSelectedAudience()
+        ]);
+        
+        setAudiences(audiencesData);
+        setSelectedAudienceId(selectedId);
+        setOriginalAudienceId(selectedId);
+      } catch (err) {
+        onError((err as Error).message || "Failed to load audience data");
+      } finally {
+        setAudiencesLoading(false);
+      }
+    };
+
     loadAudienceData();
-  }, [loadAudienceData]);
+  }, []); // Empty dependency array - only run on mount
 
   const handleSave = async () => {
     setSaveLoading(true);
@@ -89,7 +89,25 @@ export const CheckoutSession: React.FC<CheckoutSessionProps> = ({
     }
   };
 
-  const hasChanges = selectedAudienceId !== originalAudienceId;
+  const hasChanges = selectedAudienceId !== originalAudienceId && selectedAudienceId != "";
+
+  const handleRefresh = async () => {
+    setAudiencesLoading(true);
+    try {
+      const [audiencesData, selectedId] = await Promise.all([
+        onFetchAudiences(),
+        onFetchSelectedAudience()
+      ]);
+      
+      setAudiences(audiencesData);
+      setSelectedAudienceId(selectedId);
+      setOriginalAudienceId(selectedId);
+    } catch (err) {
+      onError((err as Error).message || "Failed to load audience data");
+    } finally {
+      setAudiencesLoading(false);
+    }
+  };
 
   return (
     <Box css={{
@@ -103,7 +121,7 @@ export const CheckoutSession: React.FC<CheckoutSessionProps> = ({
     }}>
       <Box css={{ stack: "x", rowGap: "medium", distribute: "space-between", alignY: "center" }}>
         <Inline css={{ color: 'primary', fontWeight: 'semibold'}}>
-          Select your Audience
+          Select Target Audience
         </Inline>
       </Box>
       
@@ -144,7 +162,7 @@ export const CheckoutSession: React.FC<CheckoutSessionProps> = ({
                 ))}
               </Select>
               <Button 
-                onPress={loadAudienceData}
+                onPress={handleRefresh}
                 loading={audiencesLoading}
                 type="secondary"
                 size="medium"

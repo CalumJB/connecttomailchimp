@@ -8,13 +8,15 @@ import {
 interface SyncingStatusProps {
   isMailchimpConnected: boolean;
   isAudienceConfigured: boolean;
+  isPermissionConfigured: boolean;
 }
 
 export const SyncingStatus: React.FC<SyncingStatusProps> = ({
   isMailchimpConnected,
-  isAudienceConfigured
+  isAudienceConfigured,
+  isPermissionConfigured
 }) => {
-  const isSyncingActive = isMailchimpConnected && isAudienceConfigured;
+  const isSyncingActive = isMailchimpConnected && isAudienceConfigured && isPermissionConfigured;
 
   return (
     <Box css={{
@@ -22,8 +24,8 @@ export const SyncingStatus: React.FC<SyncingStatusProps> = ({
       distribute: "space-between",
       alignY: "center",
       padding: "medium",
-      background: "container",
-      borderRadius: "medium"
+      background: "surface",
+      borderRadius: "medium",
     }}>
       <Box css={{ stack: "y", rowGap: "small" }}>
         <Box css={{ stack: "x", columnGap: "small" }}>
@@ -41,8 +43,11 @@ export const SyncingStatus: React.FC<SyncingStatusProps> = ({
           { isMailchimpConnected && !isAudienceConfigured && 
             "Manage Audience to begin syncing"
           }
+          { isMailchimpConnected && isAudienceConfigured && !isPermissionConfigured && 
+            "Configure permissions to begin syncing"
+          }
           {
-            isMailchimpConnected && isAudienceConfigured &&
+            isMailchimpConnected && isAudienceConfigured && isPermissionConfigured &&
             "New customers are being synced to Mailchimp"
           }
         </Inline>

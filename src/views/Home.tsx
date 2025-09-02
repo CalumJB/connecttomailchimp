@@ -21,6 +21,7 @@ import { ManageMailchimp } from "./components/ManageMailchimp";
 import { DashboardOverview } from "./components/DashboardOverview";
 import { SyncingStatus } from "./components/SyncingStatus";
 import { MetricsView } from "./components/MetricsView";
+import { ManagePermission } from "./components/ManagePermission";
 
 interface PlanInfo {
   planName: string;
@@ -40,6 +41,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   const [currentView, setCurrentView] = useState<'overview' | 'checkout' | 'subscription' | 'mailchimp' | 'metrics'>('overview');
   const [isAudienceConfigured, setIsAudienceConfigured] = useState<boolean | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const [isPermissionConfigured, setIsPermissionConfigured] = useState<boolean | null>(null);
 
   const {
     loading,
@@ -59,6 +61,9 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     completeOnboarding,
     checkOnboardingStatus,
     fetchUsage,
+    getAudienceStatus,
+    setAudienceStatus,
+    getPendingContacts,
   } = useApi(userContext);
 
   const showSuccess = (message: string) => {
@@ -75,10 +80,22 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       await disconnectMailchimp();
       setMailchimpExists(false);
       setIsAudienceConfigured(false);
+      setIsPermissionConfigured(false);
       setCurrentView('overview');
       showSuccess("Mailchimp disconnected successfully");
     } catch (err) {
       setError((err as Error).message || "Failed to disconnect Mailchimp");
+    }
+  };
+
+  const handleGetPendingContacts = async () => {
+    try {
+      const response = await getPendingContacts();
+      console.log("Pending contacts response:", response);
+      showSuccess("Check console for pending contacts data");
+    } catch (err) {
+      console.error("Failed to get pending contacts:", err);
+      setError((err as Error).message || "Failed to get pending contacts");
     }
   };
 
@@ -87,6 +104,9 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       return 'Getting started';
     }
     if (hasCompletedOnboarding === false && mailchimpExists === true && isAudienceConfigured === false) {
+      return 'Getting started';
+    }
+    if (hasCompletedOnboarding === false && mailchimpExists === true && isAudienceConfigured === true && isPermissionConfigured === false) {
       return 'Getting started';
     }
     if (currentView === 'checkout') {
@@ -107,6 +127,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   const checkAudienceConfiguration = async () => {
     try {
       const selectedId = await fetchSelectedAudience();
+      console.log("HERE SELECTED ID: " + JSON.stringify(selectedId));
       setIsAudienceConfigured(selectedId !== "");
     } catch (err) {
       console.error("Failed to check audience configuration:", err);
@@ -114,19 +135,20 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     }
   };
 
+  const checkPermissionConfiguration = async () => {
+    try {
+      const statusData = await getAudienceStatus();
+      const currentStatus = statusData.audience_status || "";
+      setIsPermissionConfigured(currentStatus !== "");
+    } catch (err) {
+      console.error("Failed to check permission configuration:", err);
+      setIsPermissionConfigured(false);
+    }
+  };
+
   const handleFirstAudienceSelection = async (audienceId: string) => {
     await saveSelectedAudience(audienceId);
     await checkAudienceConfiguration();
-    
-    // Mark onboarding as complete for first-time users
-    if (hasCompletedOnboarding === false) {
-      try {
-        await completeOnboarding();
-        setHasCompletedOnboarding(true);
-      } catch (err) {
-        console.error("Failed to mark onboarding as complete:", err);
-      }
-    }
   };
 
 
@@ -138,6 +160,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       setCurrentView('overview');
       setIsAudienceConfigured(null);
       setHasCompletedOnboarding(null);
+      setIsPermissionConfigured(null);
 
       try {
         await createUser();
@@ -165,9 +188,11 @@ const Home = ({ userContext }: ExtensionContextValue) => {
         if (mailchimpResponse.exists) {
           setMailchimpExists(true);
           await checkAudienceConfiguration();
+          await checkPermissionConfiguration();
         } else {
           setMailchimpExists(false);
           setIsAudienceConfigured(false);
+          setIsPermissionConfigured(false);
         }
 
         if (planData) {
@@ -182,8 +207,9 @@ const Home = ({ userContext }: ExtensionContextValue) => {
 
     initializeApp();
   }, [userContext?.id, userContext?.account?.id]);
+
    console.log("NOW:"  + hasCompletedOnboarding)
-  if(hasCompletedOnboarding === false && (mailchimpExists === false || isAudienceConfigured === false)){
+  if(hasCompletedOnboarding === false && (mailchimpExists === false || isAudienceConfigured === false || isPermissionConfigured === false)){
     return(
       <ContextView
       title={getTitle()}
@@ -228,6 +254,28 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       />
       )
      }
+     {
+      mailchimpExists === true && isAudienceConfigured === true && isPermissionConfigured === false && (
+        <ManagePermission
+        onGetAudienceStatus={getAudienceStatus}
+        onSetAudienceStatus={async (status) => {
+          console.log("CALLING SAT AUDIENCE STATUS")
+          await setAudienceStatus(status);
+          await checkPermissionConfiguration();
+          // Complete onboarding after permission is set
+          try {
+            await completeOnboarding();
+            setHasCompletedOnboarding(true);
+            showSuccess("Setup complete! Welcome to your dashboard.");
+          } catch (err) {
+            console.error("Failed to mark onboarding as complete:", err);
+          }
+        }}
+        onError={setError}
+        onShowSuccess={showSuccess}
+      />
+      )
+     }
     </ContextView>
     )
     
@@ -263,7 +311,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       )}
 
       <Box css={{ stack: "y", rowGap: "small" }}>
-        {(mailchimpExists === null || isAudienceConfigured === null || hasCompletedOnboarding === null || planInfo === null) && (
+        {(mailchimpExists === null || isAudienceConfigured === null || hasCompletedOnboarding === null || isPermissionConfigured === null || planInfo === null) && (
           <Box css={{ 
             padding: "large",
             alignSelfX: "center",
@@ -273,7 +321,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
           </Box>
         )}
         
-        {(mailchimpExists !== null && isAudienceConfigured !== null && hasCompletedOnboarding !== null && planInfo !== null) && (
+        {(mailchimpExists !== null && isAudienceConfigured !== null && hasCompletedOnboarding !== null && isPermissionConfigured !== null && planInfo !== null) && (
           <>
             {loading && <Inline>Loading...</Inline>}
             {error && <Inline tone="critical">Error: {error}</Inline>}
@@ -282,7 +330,8 @@ const Home = ({ userContext }: ExtensionContextValue) => {
           <>
             {currentView === 'overview' && (
               <>
-              { mailchimpExists === true && isAudienceConfigured === true && planInfo && planInfo.remainingSyncs < 101 && (
+              
+                { mailchimpExists === true && isAudienceConfigured === true && planInfo && planInfo.remainingSyncs < 101 && (
                   <UsageSection 
                   planInfo={planInfo} 
                   getPricingPageUrl={getPricingPageUrl}
@@ -294,6 +343,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   <SyncingStatus 
                   isMailchimpConnected={mailchimpExists === true}
                   isAudienceConfigured={isAudienceConfigured === true}
+                  isPermissionConfigured={isPermissionConfigured === true}
                 />
                 )}
 
@@ -307,11 +357,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                     borderRadius: "medium",
                   }}>
                     <Box css={{ stack: "y", rowGap: "small" }}>
-                      { mailchimpExists ? (
-                        <Inline css={{ font: 'body', fontWeight: 'semibold' }}>Manage Mailchimp</Inline>
-                      ) : (
-                        <Inline css={{ font: 'body', fontWeight: 'semibold' }}>Manage Mailchimp</Inline>
-                      )}
+                    <Inline css={{ font: 'body', fontWeight: 'semibold' }}>Connection</Inline>
                       <Inline css={{ font: 'caption' }}>
                         Connect and manage your Mailchimp integration.
                       </Inline>
@@ -338,7 +384,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   }}>
                     <Box css={{ stack: "y", rowGap: "small" }}>
                       <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-                        Manage Audience
+                        Audience
                       </Inline>
                       <Inline css={{ font: 'caption' }}>
                         Add or update your target Audience
@@ -365,7 +411,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   }}>
                     <Box css={{ stack: "y", rowGap: "small" }}>
                       <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-                        Manage Subscription
+                        Subscription
                       </Inline>
                       <Inline css={{ font: 'caption' }}>
                         Update billing and manage your plan
@@ -408,6 +454,34 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   </Box>
                 )}
 
+                { mailchimpExists === true && (
+                  <Box css={{
+                    stack: "x",
+                    distribute: "space-between",
+                    alignY: "center",
+                    padding: "medium",
+                    background: "container",
+                    borderRadius: "medium"
+                  }}>
+                    <Box css={{ stack: "y", rowGap: "small" }}>
+                      <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
+                        Pending Contacts
+                      </Inline>
+                      <Inline css={{ font: 'caption' }}>
+                        Get pending contacts (check console)
+                      </Inline>
+                    </Box>
+                    <Button
+                      onPress={handleGetPendingContacts}
+                      type="secondary"
+                      size="small"
+                    >
+                      Get Data
+                    </Button>
+                  </Box>
+                )}
+
+
                 {/* {planInfo && <UsageSection 
                   planInfo={planInfo} 
                   getPricingPageUrl={getPricingPageUrl}
@@ -449,6 +523,15 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   onClearAudience={async () => {
                     await clearAudienceSelection();
                     await checkAudienceConfiguration();
+                  }}
+                  onError={setError}
+                  onShowSuccess={showSuccess}
+                />
+                <ManagePermission
+                  onGetAudienceStatus={getAudienceStatus}
+                  onSetAudienceStatus={async (status: string) => {
+                    await setAudienceStatus(status);
+                    await checkPermissionConfiguration();
                   }}
                   onError={setError}
                   onShowSuccess={showSuccess}
