@@ -15,15 +15,17 @@ interface StatusOption {
 }
 
 interface ManagePermissionProps {
-  onGetAudienceStatus: () => Promise<{audience_status: string}>;
-  onSetAudienceStatus: (status: string) => Promise<any>;
+  onFetchPermissionStatus: () => Promise<{audience_status: string}>;
+  onSavePermissionStatus: (status: string) => Promise<any>;
+  onClearPermissionStatus?: () => Promise<any>;
   onError: (error: string) => void;
   onShowSuccess: (message: string) => void;
 }
 
 export const ManagePermission: React.FC<ManagePermissionProps> = ({
-  onGetAudienceStatus,
-  onSetAudienceStatus,
+  onFetchPermissionStatus,
+  onSavePermissionStatus,
+  onClearPermissionStatus,
   onError,
   onShowSuccess
 }) => {
@@ -55,7 +57,7 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
       console.log("loadStatusData called on mount");
       setStatusLoading(true);
       try {
-        const statusData = await onGetAudienceStatus();
+        const statusData = await onFetchPermissionStatus();
         console.log("HERE: " + JSON.stringify(statusData))
         const currentStatus = statusData.audience_status || "";
         console.log("loadStatusData - fetched status:", currentStatus);
@@ -76,7 +78,7 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
     console.log("handleSave - selectedStatusId:", selectedStatusId, "originalStatusId:", originalStatusId);
     setSaveLoading(true);
     try {
-      await onSetAudienceStatus(selectedStatusId);
+      await onSavePermissionStatus(selectedStatusId);
       console.log("Save successful, updating originalStatusId to:", selectedStatusId);
       // Update originalStatusId immediately after successful save
       setOriginalStatusId(selectedStatusId);

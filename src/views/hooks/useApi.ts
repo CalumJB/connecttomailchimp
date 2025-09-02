@@ -336,7 +336,7 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
     return await response.json();
   };
 
-  const getAudienceStatus = async () => {
+  const fetchPermissionStatus = async () => {
     const signature = await fetchStripeSignature();
     const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/get`, {
       method: "POST",
@@ -350,11 +350,11 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
       }),
     });
 
-    await handleApiError(response, "Failed to fetch audience status");
+    await handleApiError(response, "Failed to fetch permission status");
     return await response.json();
   };
 
-  const setAudienceStatus = async (status: string) => {
+  const savePermissionStatus = async (status: string) => {
     const signature = await fetchStripeSignature();
     const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/post`, {
       method: "POST",
@@ -369,8 +369,32 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
       }),
     });
 
-    await handleApiError(response, "Failed to set audience status");
+    await handleApiError(response, "Failed to save permission status");
     return await response.json();
+  };
+
+  const clearPermissionStatus = async () => {
+    const signature = await fetchStripeSignature();
+    const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/delete`, {
+      method: "DELETE",
+      headers: {
+        "Stripe-Signature": signature,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userContext?.id,
+        account_id: userContext?.account?.id,
+      }),
+    });
+
+    await handleApiError(response, "Failed to clear permission status");
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      const text = await response.text();
+      return { message: text };
+    }
   };
 
   const getPendingContacts = async () => {
@@ -410,8 +434,9 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
     completeOnboarding,
     checkOnboardingStatus,
     fetchUsage,
-    getAudienceStatus,
-    setAudienceStatus,
+    fetchPermissionStatus,
+    savePermissionStatus,
+    clearPermissionStatus,
     getPendingContacts,
   };
 };

@@ -15,7 +15,7 @@ interface MailchimpAudience {
   member_count: number;
 }
 
-interface CheckoutSessionProps {
+interface ManageAudienceProps {
   onFetchAudiences: () => Promise<MailchimpAudience[]>;
   onFetchSelectedAudience: () => Promise<string>;
   onSaveAudience: (audienceId: string) => Promise<void>;
@@ -24,7 +24,7 @@ interface CheckoutSessionProps {
   onShowSuccess: (message: string) => void;
 }
 
-export const CheckoutSession: React.FC<CheckoutSessionProps> = ({
+export const ManageAudience: React.FC<ManageAudienceProps> = ({
   onFetchAudiences,
   onFetchSelectedAudience,
   onSaveAudience,

@@ -16,7 +16,7 @@ import { useApi } from "./hooks/useApi";
 import { PlanInfoSection } from "./components/PlanInfoSection";
 import { UsageSection } from "./components/UsageSection";
 import { SubscriptionManagement } from "./components/SubscriptionManagement";
-import { CheckoutSession } from "./components/CheckoutSession";
+import { ManageAudience } from "./components/ManageAudience";
 import { ManageMailchimp } from "./components/ManageMailchimp";
 import { DashboardOverview } from "./components/DashboardOverview";
 import { SyncingStatus } from "./components/SyncingStatus";
@@ -61,8 +61,8 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     completeOnboarding,
     checkOnboardingStatus,
     fetchUsage,
-    getAudienceStatus,
-    setAudienceStatus,
+    fetchPermissionStatus,
+    savePermissionStatus,
     getPendingContacts,
   } = useApi(userContext);
 
@@ -137,7 +137,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
 
   const checkPermissionConfiguration = async () => {
     try {
-      const statusData = await getAudienceStatus();
+      const statusData = await fetchPermissionStatus();
       const currentStatus = statusData.audience_status || "";
       setIsPermissionConfigured(currentStatus !== "");
     } catch (err) {
@@ -145,12 +145,6 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       setIsPermissionConfigured(false);
     }
   };
-
-  const handleFirstAudienceSelection = async (audienceId: string) => {
-    await saveSelectedAudience(audienceId);
-    await checkAudienceConfiguration();
-  };
-
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -241,10 +235,13 @@ const Home = ({ userContext }: ExtensionContextValue) => {
      }
      {
       mailchimpExists === true && isAudienceConfigured === false && (
-        <CheckoutSession
+        <ManageAudience
         onFetchAudiences={fetchAudiences}
         onFetchSelectedAudience={fetchSelectedAudience}
-        onSaveAudience={handleFirstAudienceSelection}
+        onSaveAudience={async (audienceId: string) => {
+          await saveSelectedAudience(audienceId);
+          await checkAudienceConfiguration();
+        }}
         onClearAudience={async () => {
           await clearAudienceSelection();
           await checkAudienceConfiguration();
@@ -257,10 +254,10 @@ const Home = ({ userContext }: ExtensionContextValue) => {
      {
       mailchimpExists === true && isAudienceConfigured === true && isPermissionConfigured === false && (
         <ManagePermission
-        onGetAudienceStatus={getAudienceStatus}
-        onSetAudienceStatus={async (status) => {
-          console.log("CALLING SAT AUDIENCE STATUS")
-          await setAudienceStatus(status);
+        onFetchPermissionStatus={fetchPermissionStatus}
+        onSavePermissionStatus={async (status) => {
+          console.log("CALLING SAVE PERMISSION STATUS")
+          await savePermissionStatus(status);
           await checkPermissionConfiguration();
           // Complete onboarding after permission is set
           try {
@@ -513,7 +510,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   ← Back
                 </Button>
               </Box>
-                <CheckoutSession
+                <ManageAudience
                   onFetchAudiences={fetchAudiences}
                   onFetchSelectedAudience={fetchSelectedAudience}
                   onSaveAudience={async (audienceId: string) => {
@@ -528,9 +525,9 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   onShowSuccess={showSuccess}
                 />
                 <ManagePermission
-                  onGetAudienceStatus={getAudienceStatus}
-                  onSetAudienceStatus={async (status: string) => {
-                    await setAudienceStatus(status);
+                  onFetchPermissionStatus={fetchPermissionStatus}
+                  onSavePermissionStatus={async (status: string) => {
+                    await savePermissionStatus(status);
                     await checkPermissionConfiguration();
                   }}
                   onError={setError}
