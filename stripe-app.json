@@ -1,6 +1,6 @@
 {
-  "id": "connecttomailchimp-demo",
-  "version": "1.0.5",
+  "id": "connecttomailchimp-app",
+  "version": "1.0.7",
   "name": "Connect to Mailchimp",
   "icon": "src/views/icon.png",
   "permissions": [
@@ -25,5 +25,5 @@
       "purpose": "This urls allow Connect To Mailchimp to call backend server for user management and mailchimp integration."
     }
   },
-  "distribution_type": "private"
+  "distribution_type": "public"
 }

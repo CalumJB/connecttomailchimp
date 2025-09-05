@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ExtensionContextValue } from "@stripe/ui-extension-sdk/context";
 import { fetchStripeSignature } from "@stripe/ui-extension-sdk/utils";
 
-const isDev = true; // REMEMBER TO CHANGE ME
+const isDev = false; // REMEMBER TO CHANGE ME
 
 const getBaseUrl = () => {
   return isDev 
@@ -19,7 +19,7 @@ const getMailchimpClientId = () => {
 const getPricingPage = () => {
   return isDev
   ? "https://www.connectto.app/demo-pricing"
-  : "'"
+  : "https://www.connectto.app/pricing"
 }
 
 interface PlanInfo {

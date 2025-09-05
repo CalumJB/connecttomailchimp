@@ -5,7 +5,8 @@ import {
   Inline,
   Select,
   Icon,
-  Link
+  Link,
+  Spinner
 } from "@stripe/ui-extension-sdk/ui";
 
 interface StatusOption {
@@ -36,14 +37,14 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
       description: "New contacts will be emailed and asked to opt-in to this audience. Once accepted, contacts can recieve marketing emails. Contacts will not appear in your audience until they accept."
     },
     {
+      id: "subscribed",
+      name: "Subscribed", 
+      description: "Subscribed users are automatically added to your Mailchimp audience. They will not receive a confirmation email from Mailchimp. Be sure you are compliant with local laws and regulations."
+    },
+    {
       id: "transactional", 
       name: "Transactional",
       description: "Transactional contacts cannot receive marketing messages, but they can be sent transactional messages such as receipts and shipping information."
-    },
-    {
-      id: "subscribed",
-      name: "Subscribed", 
-      description: "Subscribed users are automatically added to your Mailchimp audience. They will not receive a confirmation email from Mailchimp. Be extra sure you have permission first."
     }
   ]);
   
@@ -54,16 +55,12 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
 
   useEffect(() => {
     const loadStatusData = async () => {
-      console.log("loadStatusData called on mount");
       setStatusLoading(true);
       try {
         const statusData = await onFetchPermissionStatus();
-        console.log("HERE: " + JSON.stringify(statusData))
         const currentStatus = statusData.audience_status || "";
-        console.log("loadStatusData - fetched status:", currentStatus);
         setSelectedStatusId(currentStatus);
         setOriginalStatusId(currentStatus);
-        console.log("loadStatusData - set both selectedStatusId and originalStatusId to:", currentStatus);
       } catch (err) {
         onError((err as Error).message || "Failed to load permission status");
       } finally {
@@ -83,7 +80,7 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
       // Update originalStatusId immediately after successful save
       setOriginalStatusId(selectedStatusId);
       const selectedStatus = statuses.find(s => s.id === selectedStatusId);
-      onShowSuccess(selectedStatusId !== "" ? `Status set to ${selectedStatus?.name}` : "Status cleared");
+      onShowSuccess("Permissions updated.");
       console.log("Save complete - new originalStatusId should be:", selectedStatusId);
     } catch (err) {
       console.log("Save failed:", err);
@@ -94,7 +91,7 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
   };
 
   const hasChanges = selectedStatusId !== originalStatusId && selectedStatusId !== "";
-  console.log("hasChanges:", hasChanges, "selectedStatusId:", selectedStatusId, "originalStatusId:", originalStatusId);
+  console.log("hasChanges:", hasChanges, "selectedStatusId:", selectedStatusId, "originalStatusId:", "originalStatusId");
 
   return (
     <Box css={{
@@ -108,13 +105,10 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
     }}>
       <Box css={{ stack: "x", rowGap: "medium", distribute: "space-between", alignY: "center" }}>
         <Inline css={{ color: 'primary', fontWeight: 'semibold'}}>
-          Audience Permissions
+          Permissions
         </Inline>
       </Box>
       
-      <Inline>
-      Contacts synced to Mailchimp are assigned a permission status. Update this setting to control the types of emails your audience can receive.
-      </Inline>
       <Link
               external
               href="https://mailchimp.com/help/the-importance-of-permission/"
@@ -123,6 +117,21 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
             >
               Learn about Mailchimp permissions
             </Link>
+      <Inline>
+        Choose the type of contact to add to Mailchimp.
+      </Inline>
+      <Box css={{ stack: "y" }}>
+      <Inline css={{ fontWeight: "semibold" }}>Double Opt-In</Inline>
+      <Inline css={{ }}>Customers receive an email from Mailchimp to opt-in to marketing emails.  (Recommended for UK/EU/Other)</Inline>
+      </Box>
+      <Box css={{ stack: "y" }}>
+      <Inline css={{ fontWeight: "semibold" }}>Subscribed</Inline>
+      <Inline css={{ }}>Customers are added immediately and can receive marketing emails. (You should ensure compliance.)</Inline>
+      </Box>
+      <Box css={{ stack: "y" }}>
+      <Inline css={{ fontWeight: "semibold" }}>Transactional</Inline>
+      <Inline css={{ }}>Customers are added for receipts/invoices only.</Inline>
+      </Box>
       
       {statusLoading ? (
         <Inline>Loading current status...</Inline>
@@ -168,12 +177,12 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
           <Box css={{ stack: "y", rowGap: "medium" }}>
             <Box css={{ stack: "x", columnGap: "medium" }}>
               <Button 
-                onPress={handleSave} 
-                loading={saveLoading}
-                disabled={!hasChanges}
+                onPress={handleSave}
+                disabled={!hasChanges || saveLoading}
                 type="primary"
               >
-                Save Selection
+                { saveLoading && (<Spinner size='small'/>)}
+                Save
               </Button>
             </Box>
           </Box>

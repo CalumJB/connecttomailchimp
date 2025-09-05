@@ -6,7 +6,8 @@ import {
   Select,
   Badge,
   Icon,
-  Link
+  Link,
+  Spinner
 } from "@stripe/ui-extension-sdk/ui";
 
 interface MailchimpAudience {
@@ -19,7 +20,6 @@ interface ManageAudienceProps {
   onFetchAudiences: () => Promise<MailchimpAudience[]>;
   onFetchSelectedAudience: () => Promise<string>;
   onSaveAudience: (audienceId: string) => Promise<void>;
-  onClearAudience: () => Promise<void>;
   onError: (error: string) => void;
   onShowSuccess: (message: string) => void;
 }
@@ -28,7 +28,6 @@ export const ManageAudience: React.FC<ManageAudienceProps> = ({
   onFetchAudiences,
   onFetchSelectedAudience,
   onSaveAudience,
-  onClearAudience,
   onError,
   onShowSuccess
 }) => {
@@ -37,7 +36,6 @@ export const ManageAudience: React.FC<ManageAudienceProps> = ({
   const [originalAudienceId, setOriginalAudienceId] = useState<string>("");
   const [audiencesLoading, setAudiencesLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [showConfirmClear, setShowConfirmClear] = useState(false);
 
   useEffect(() => {
     const loadAudienceData = async () => {
@@ -66,7 +64,7 @@ export const ManageAudience: React.FC<ManageAudienceProps> = ({
     try {
       await onSaveAudience(selectedAudienceId);
       setOriginalAudienceId(selectedAudienceId);
-      onShowSuccess(selectedAudienceId !== "" ? "Syncing Enabled" : "Syncing Disabled");
+      onShowSuccess("Audience Updated.");
     } catch (err) {
       onError((err as Error).message || "Failed to save audience selection");
     } finally {
@@ -74,20 +72,6 @@ export const ManageAudience: React.FC<ManageAudienceProps> = ({
     }
   };
 
-  const handleClear = async () => {
-    setSaveLoading(true);
-    try {
-      await onClearAudience();
-      setSelectedAudienceId("");
-      setOriginalAudienceId("");
-      setShowConfirmClear(false);
-      onShowSuccess("Syncing Disabled");
-    } catch (err) {
-      onError((err as Error).message || "Failed to clear audience selection");
-    } finally {
-      setSaveLoading(false);
-    }
-  };
 
   const hasChanges = selectedAudienceId !== originalAudienceId && selectedAudienceId != "";
 
@@ -121,7 +105,7 @@ export const ManageAudience: React.FC<ManageAudienceProps> = ({
     }}>
       <Box css={{ stack: "x", rowGap: "medium", distribute: "space-between", alignY: "center" }}>
         <Inline css={{ color: 'primary', fontWeight: 'semibold'}}>
-          Select Target Audience
+          Audience
         </Inline>
       </Box>
       
@@ -174,52 +158,14 @@ export const ManageAudience: React.FC<ManageAudienceProps> = ({
           <Box css={{ stack: "y", rowGap: "medium" }}>
             <Box css={{ stack: "x", columnGap: "medium" }}>
               <Button 
-                onPress={handleSave} 
-                loading={saveLoading}
-                disabled={!hasChanges}
+                onPress={handleSave}
+                disabled={!hasChanges || saveLoading}
                 type="primary"
               >
-                Save Selection
+                { saveLoading && (<Spinner size='small'/>) }
+                Save
               </Button>
-              {originalAudienceId !== "" && !showConfirmClear && (
-                <Button
-                  onPress={() => setShowConfirmClear(true)}
-                  loading={saveLoading}
-                  type="destructive"
-                >
-                  Disable
-                </Button>
-              )}
             </Box>
-            {showConfirmClear && (
-              <Box css={{ stack: "y", rowGap: "small", padding: "medium", background: "container" }}>
-                <Inline css={{ fontWeight: "semibold" }}>
-                  Are you sure you want to disabled?
-                </Inline>
-                <Inline>
-                  This will stop syncing customer emails to Mailchimp.
-                </Inline>
-                <Box>
-                  <Button 
-                    onPress={handleClear}
-                    loading={saveLoading}
-                    type="destructive"
-                    size="small"
-                  >
-                    Confirm
-                  </Button>
-                </Box>
-                <Box>
-                  <Button 
-                    onPress={() => setShowConfirmClear(false)}
-                    type="secondary"
-                    size="small"
-                  >
-                    Cancel
-                  </Button>
-                </Box>
-              </Box>
-            )}
           </Box>
         </>
       )}

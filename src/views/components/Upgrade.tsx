@@ -15,13 +15,13 @@ interface PlanInfo {
   status: string;
 }
 
-interface UsageSectionProps {
+interface UpgradeProps {
   planInfo: PlanInfo | null;
   getPricingPageUrl: (accountId: string) => string;
   accountId: string;
 }
 
-export const UsageSection: React.FC<UsageSectionProps> = ({
+export const Upgrade: React.FC<UpgradeProps> = ({
   planInfo,
   getPricingPageUrl,
   accountId
@@ -41,7 +41,6 @@ export const UsageSection: React.FC<UsageSectionProps> = ({
           background: "container",
           borderRadius: "medium"
         }}>
-    
           <Inline>
             You only have {planInfo.remainingSyncs} syncs remaining.
           </Inline>

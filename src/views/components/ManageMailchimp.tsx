@@ -3,7 +3,9 @@ import {
   Box,
   Button,
   Inline,
-  Icon
+  Icon,
+  Link,
+  Spinner
 } from "@stripe/ui-extension-sdk/ui";
 
 interface ManageMailchimpProps {
@@ -29,7 +31,7 @@ export const ManageMailchimp: React.FC<ManageMailchimpProps> = ({
     try {
       await onDisconnect();
       setShowConfirmDisconnect(false);
-      onShowSuccess("Mailchimp disconnected successfully");
+      onShowSuccess("Mailchimp disconnected.");
     } catch (err) {
       onError((err as Error).message || "Failed to disconnect Mailchimp");
     } finally {
@@ -112,10 +114,11 @@ export const ManageMailchimp: React.FC<ManageMailchimpProps> = ({
             <Box css={{ stack: "x", columnGap: "medium" }}>
               <Button 
                 onPress={handleDisconnect}
-                loading={disconnectLoading}
+                disabled={disconnectLoading}
                 type="destructive"
                 size="medium"
               >
+                {disconnectLoading && (<Spinner size='small'/>)}
                 Yes, Disconnect
               </Button>
               <Button 

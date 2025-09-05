@@ -3,7 +3,8 @@ import {
   Box,
   Button,
   Inline,
-  Icon
+  Icon,
+  Spinner
 } from "@stripe/ui-extension-sdk/ui";
 
 interface PlanInfo {
@@ -51,10 +52,13 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
         }}>
           <Box css={{ stack: "y", rowGap: "small" }}>
             <Inline css={{ fontWeight: 'semibold' }}>
-              Current Plan: {planInfo.planDisplayName}
+              Current plan: {planInfo.planDisplayName}
             </Inline>
             <Inline css={{ font: 'body' }}>
-              Sync Limit: {planInfo.monthlySyncLimit === -1 ? 'Unlimited' : planInfo.monthlySyncLimit} syncs per month
+              Sync limit: {planInfo.monthlySyncLimit === -1 ? 'Unlimited' : planInfo.monthlySyncLimit} syncs per month
+            </Inline>
+            <Inline css={{ font: 'body' }}>
+              Used this month: {planInfo.currentMonthUsage}
             </Inline>
           </Box>
         </Box>
@@ -80,10 +84,11 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
       {!customerPortalUrl ? (
         <Button 
           onPress={handleGetPortalUrl}
-          loading={loading}
+          disabled={loading}
           type="secondary"
           size="medium"
         >
+          { loading && (<Spinner size='small'/>)}
           Get Management Link
         </Button>
       ) : (
