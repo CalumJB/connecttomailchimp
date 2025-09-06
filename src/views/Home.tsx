@@ -14,6 +14,7 @@ import React, { useState, useEffect } from "react";
 import BrandIcon from "./connecttostripe.svg";
 import { useApi } from "./hooks/useApi";
 import { Upgrade } from "./components/Upgrade";
+import { Subscribe } from "./components/Subscribe";
 import { SubscriptionManagement } from "./components/SubscriptionManagement";
 import { ManageAudience } from "./components/ManageAudience";
 import { ManageMailchimp } from "./components/ManageMailchimp";
@@ -70,6 +71,9 @@ const Home = ({ userContext }: ExtensionContextValue) => {
       setShowSuccessNotification(false);
     }, 3000);
   };
+  const logSuccess = (message: string) => {
+    console.log(message)
+  };
 
 
   const handleDisconnectMailchimp = async () => {
@@ -87,7 +91,6 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     setPendingContactsLoading(true);
     try {
       const response = await getPendingContacts();
-      console.log("Pending contacts response:", response);
       showSuccess("Check console for pending contacts data");
     } catch (err) {
       console.error("Failed to get pending contacts:", err);
@@ -125,7 +128,6 @@ const Home = ({ userContext }: ExtensionContextValue) => {
   const checkAudienceConfiguration = async () => {
     try {
       const selectedId = await fetchSelectedAudience();
-      console.log("HERE SELECTED ID: " + JSON.stringify(selectedId));
       setAudience(selectedId || "");
     } catch (err) {
       console.error("Failed to check audience configuration:", err);
@@ -160,9 +162,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
         // Check onboarding status first, default to true if failed
         try {
           const onboardingStatus = await checkOnboardingStatus();
-          console.log("Onboarding status response:", onboardingStatus);
           const isCompleted = Boolean(onboardingStatus?.completed);
-          console.log("Is completed:", isCompleted);
           setHasCompletedOnboarding(isCompleted);
         } catch (err) {
           console.error("Failed to check onboarding status, defaulting to true:", err);
@@ -200,7 +200,6 @@ const Home = ({ userContext }: ExtensionContextValue) => {
     initializeApp();
   }, [userContext?.id, userContext?.account?.id]);
 
-   console.log("NOW:"  + hasCompletedOnboarding)
   if(hasCompletedOnboarding === false && (mailchimpExists === false || audience === null || audience === "" || permissions === null || permissions === "")){
     return(
       <ContextView
@@ -227,7 +226,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
         onDisconnect={handleDisconnectMailchimp}
         getAuthUrl={getMailchimpAuthUrl}
         onError={setError}
-        onShowSuccess={showSuccess}
+        onShowSuccess={logSuccess}
       />
       )
      }
@@ -241,7 +240,7 @@ const Home = ({ userContext }: ExtensionContextValue) => {
           await checkAudienceConfiguration();
         }}
         onError={setError}
-        onShowSuccess={showSuccess}
+        onShowSuccess={logSuccess}
       />
       )
      }
@@ -250,20 +249,19 @@ const Home = ({ userContext }: ExtensionContextValue) => {
         <ManagePermission
         onFetchPermissionStatus={fetchPermissionStatus}
         onSavePermissionStatus={async (status) => {
-          console.log("CALLING SAVE PERMISSION STATUS")
           await savePermissionStatus(status);
           await checkPermissionConfiguration();
           // Complete onboarding after permission is set
           try {
             await completeOnboarding();
             setHasCompletedOnboarding(true);
-            showSuccess("Setup complete! Welcome to your dashboard.");
+            // showSuccess("Setup complete! Welcome to your dashboard.");
           } catch (err) {
             console.error("Failed to mark onboarding as complete:", err);
           }
         }}
         onError={setError}
-        onShowSuccess={showSuccess}
+        onShowSuccess={logSuccess}
       />
       )
      }
@@ -321,155 +319,115 @@ const Home = ({ userContext }: ExtensionContextValue) => {
           <>
             {currentView === 'overview' && (
               <>
-              
-                { mailchimpExists === true && audience && audience !== "" && planInfo && planInfo.remainingSyncs < 50 && (
-                  <Upgrade 
-                  planInfo={planInfo} 
-                  getPricingPageUrl={getPricingPageUrl}
-                  accountId={userContext?.account?.id || ""}
+                { planInfo.planName === "NONE" ? (
+                  <Subscribe 
+                    getPricingPageUrl={getPricingPageUrl}
+                    accountId={userContext?.account?.id || ""}
                   />
+                ) : (
+                  <>
+                    {/* { mailchimpExists === true && audience && audience !== "" && planInfo && planInfo.remainingSyncs < 50 && (
+                      <Upgrade 
+                      planInfo={planInfo} 
+                      getPricingPageUrl={getPricingPageUrl}
+                      accountId={userContext?.account?.id || ""}
+                      />
+                    )} */}
+
+                    { true && (
+                      <Status
+                      isMailchimpConnected={mailchimpExists === true}
+                      audience={audience}
+                      permissions={permissions}
+                      onFetchUsage={fetchUsage}
+                      onError={setError}
+                      planInfo={planInfo}
+                      getPricingPageUrl={getPricingPageUrl}
+                      accountId={userContext?.account?.id || ""}
+                    />
+                    )}
+
+                    { true && (
+                      <Box css={{
+                        stack: "x",
+                        distribute: "space-between",
+                        alignY: "center",
+                        padding: "medium",
+                        background: "container",
+                        borderRadius: "medium",
+                      }}>
+                        <Box css={{ stack: "y", rowGap: "small" }}>
+                        <Inline css={{ font: 'body', fontWeight: 'semibold' }}>Connection</Inline>
+                          <Inline css={{ font: 'caption' }}>
+                            Manage your Mailchimp integration.
+                          </Inline>
+                        </Box>
+                        <Button
+                          onPress={() => setCurrentView('mailchimp')}
+                          type="secondary"
+                          size="small"
+                        >
+                          <Icon css={{fill: "primary"}} name="arrowRight" />
+                        </Button>
+                      </Box>
+                    )}
+
+                    { mailchimpExists === true && (
+                      <Box css={{
+                        stack: "x",
+                        // columnGap: "small",
+                        distribute: "space-between",
+                        alignY: "center",
+                        padding: "medium",
+                        background: "container",
+                        borderRadius: "medium"
+                      }}>
+                        <Box css={{ stack: "y", rowGap: "small" }}>
+                          <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
+                            Audience
+                          </Inline>
+                          <Inline css={{ font: 'caption' }}>
+                            Add or update your target Audience.
+                          </Inline>
+                        </Box>
+                        <Button
+                          onPress={() => setCurrentView('checkout')}
+                          type="secondary"
+                          size="small"
+                        >
+                          <Icon name="arrowRight" />
+                        </Button>
+                      </Box>
+                    )}
+
+                    { true && (
+                      <Box css={{
+                        stack: "x",
+                        distribute: "space-between",
+                        alignY: "center",
+                        padding: "medium",
+                        background: "container",
+                        borderRadius: "medium"
+                      }}>
+                        <Box css={{ stack: "y", rowGap: "small" }}>
+                          <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
+                            Subscription
+                          </Inline>
+                          <Inline css={{ font: 'caption' }}>
+                            Update billing and manage your plan.
+                          </Inline>
+                        </Box>
+                        <Button
+                          onPress={() => setCurrentView('subscription')}
+                          type="secondary"
+                          size="small"
+                        >
+                          <Icon name="arrowRight" />
+                        </Button>
+                      </Box>
+                    )}
+                  </>
                 )}
-
-                { true && (
-                  <Status
-                  isMailchimpConnected={mailchimpExists === true}
-                  audience={audience}
-                  permissions={permissions}
-                  onFetchUsage={fetchUsage}
-                  onError={setError}
-                  planInfo={planInfo}
-                  getPricingPageUrl={getPricingPageUrl}
-                  accountId={userContext?.account?.id || ""}
-                />
-                )}
-
-                { true && (
-                  <Box css={{
-                    stack: "x",
-                    distribute: "space-between",
-                    alignY: "center",
-                    padding: "medium",
-                    background: "container",
-                    borderRadius: "medium",
-                  }}>
-                    <Box css={{ stack: "y", rowGap: "small" }}>
-                    <Inline css={{ font: 'body', fontWeight: 'semibold' }}>Connection</Inline>
-                      <Inline css={{ font: 'caption' }}>
-                        Manage your Mailchimp integration.
-                      </Inline>
-                    </Box>
-                    <Button
-                      onPress={() => setCurrentView('mailchimp')}
-                      type="secondary"
-                      size="small"
-                    >
-                      <Icon css={{fill: "primary"}} name="arrowRight" />
-                    </Button>
-                  </Box>
-                )}
-
-                { mailchimpExists === true && (
-                  <Box css={{
-                    stack: "x",
-                    // columnGap: "small",
-                    distribute: "space-between",
-                    alignY: "center",
-                    padding: "medium",
-                    background: "container",
-                    borderRadius: "medium"
-                  }}>
-                    <Box css={{ stack: "y", rowGap: "small" }}>
-                      <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-                        Audience
-                      </Inline>
-                      <Inline css={{ font: 'caption' }}>
-                        Add or update your target Audience.
-                      </Inline>
-                    </Box>
-                    <Button
-                      onPress={() => setCurrentView('checkout')}
-                      type="secondary"
-                      size="small"
-                    >
-                      <Icon name="arrowRight" />
-                    </Button>
-                  </Box>
-                )}
-
-                { planInfo && planInfo.planName !== "FREE" && (
-                  <Box css={{
-                    stack: "x",
-                    distribute: "space-between",
-                    alignY: "center",
-                    padding: "medium",
-                    background: "container",
-                    borderRadius: "medium"
-                  }}>
-                    <Box css={{ stack: "y", rowGap: "small" }}>
-                      <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-                        Subscription
-                      </Inline>
-                      <Inline css={{ font: 'caption' }}>
-                        Update billing and manage your plan.
-                      </Inline>
-                    </Box>
-                    <Button
-                      onPress={() => setCurrentView('subscription')}
-                      type="secondary"
-                      size="small"
-                    >
-                      <Icon name="arrowRight" />
-                    </Button>
-                  </Box>
-                )}
-
-                {/* { mailchimpExists === true && (
-                  <Box css={{
-                    stack: "x",
-                    distribute: "space-between",
-                    alignY: "center",
-                    padding: "medium",
-                    background: "container",
-                    borderRadius: "medium"
-                  }}>
-                    <Box css={{ stack: "y", rowGap: "small" }}>
-                      <Inline css={{ font: 'body', fontWeight: 'semibold' }}>
-                        Pending Contacts
-                      </Inline>
-                      <Inline css={{ font: 'caption' }}>
-                        Get pending contacts (check console)
-                      </Inline>
-                    </Box>
-                    <Button
-                      onPress={handleGetPendingContacts}
-                      loading={pendingContactsLoading}
-                      type="secondary"
-                      size="small"
-                    >
-                      Get Data
-                    </Button>
-                  </Box>
-                )} */}
-
-
-                {/* {planInfo && <Upgrade 
-                  planInfo={planInfo} 
-                  getPricingPageUrl={getPricingPageUrl}
-                  accountId={userContext?.account?.id || ""}
-                />} */}
-
-                {/* <Status 
-                  isMailchimpConnected={mailchimpExists === true}
-                  audience={audience}
-                  permissions={permissions}
-                /> */}
-{/* 
-                <DashboardOverview
-                  planName={planInfo?.planName || ""}
-                  onNavigateToCheckout={() => setCurrentView('checkout')}
-                  onNavigateToSubscription={() => setCurrentView('subscription')}
-                  onNavigateToMailchimp={() => setCurrentView('mailchimp')}
-                /> */}
               </>
             )}
 
@@ -521,6 +479,8 @@ const Home = ({ userContext }: ExtensionContextValue) => {
                   planInfo={planInfo}
                   onFetchPortalUrl={fetchCustomerPortalUrl}
                   onError={setError}
+                  getPricingPageUrl={getPricingPageUrl}
+                  accountId={userContext?.account?.id || ""}
                 />
               </>
             )}

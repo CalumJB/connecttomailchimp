@@ -6,6 +6,7 @@ import {
   Icon,
   Spinner
 } from "@stripe/ui-extension-sdk/ui";
+import { Subscribe } from './Subscribe';
 
 interface PlanInfo {
   planName: string;
@@ -20,12 +21,16 @@ interface SubscriptionManagementProps {
   planInfo: PlanInfo | null;
   onFetchPortalUrl: () => Promise<string>;
   onError: (error: string) => void;
+  getPricingPageUrl: (accountId: string) => string;
+  accountId: string;
 }
 
 export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
   planInfo,
   onFetchPortalUrl,
-  onError
+  onError,
+  getPricingPageUrl,
+  accountId
 }) => {
   const [customerPortalUrl, setCustomerPortalUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +46,15 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
       setLoading(false);
     }
   };
+
+  if (planInfo?.planName === "NONE"){
+    return(
+      <Subscribe 
+        getPricingPageUrl={getPricingPageUrl}
+        accountId={accountId}
+      />
+    )
+  }
 
   return (
     <Box css={{ stack: "y", rowGap: "medium" }}>

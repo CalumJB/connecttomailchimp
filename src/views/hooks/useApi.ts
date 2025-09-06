@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ExtensionContextValue } from "@stripe/ui-extension-sdk/context";
 import { fetchStripeSignature } from "@stripe/ui-extension-sdk/utils";
 
-const isDev = false; // REMEMBER TO CHANGE ME
+const isDev = true; // REMEMBER TO CHANGE ME
 
 const getBaseUrl = () => {
   return isDev 
@@ -37,6 +37,43 @@ interface MailchimpAudience {
   member_count: number;
 }
 
+const withRetry = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+
+      lastError = error as Error;
+      
+      // Don't retry on client errors (4xx) except for rate limiting (429)
+      if (error instanceof Error && error.message.includes('401') || 
+          error.message.includes('403') || error.message.includes('404')) {
+        throw error;
+      }
+      
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries) {
+        console.log("Retry attempts failed.")
+        throw lastError;
+      }
+      
+      // Wait with exponential backoff before retrying
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      console.log("Retrying.")
+    }
+  }
+  console.log("Retry attempts failed.")
+  throw lastError!;
+};
+
 export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,196 +90,214 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   };
 
   const createUser = async () => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/stripe/create`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/stripe/create`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to create user");
+      return await response.json();
     });
-
-    await handleApiError(response, "Failed to create user");
-    return await response.json();
   };
 
   const checkMailchimpUser = async () => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/stripe/account/mailchimp`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/stripe/account/mailchimp`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to fetch Mailchimp user");
+      return await response.json();
     });
-
-    await handleApiError(response, "Failed to fetch Mailchimp user");
-    return await response.json();
   };
 
   const fetchPlanInfo = async (): Promise<PlanInfo> => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/user/plan-info`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/user/plan-info`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to fetch plan info");
+      return await response.json();
     });
-
-    await handleApiError(response, "Failed to fetch plan info");
-    return await response.json();
   };
 
   const fetchCustomerPortalUrl = async (): Promise<string> => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/user/customer-portal`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/user/customer-portal`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to fetch customer portal URL");
+      const data = await response.json();
+      return data.url;
     });
-
-    await handleApiError(response, "Failed to fetch customer portal URL");
-    const data = await response.json();
-    return data.url;
   };
 
   const fetchAudiences = async (): Promise<MailchimpAudience[]> => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audiences`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/audiences`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to fetch audiences");
+      const data = await response.json();
+      return data.lists || [];
     });
-
-    await handleApiError(response, "Failed to fetch audiences");
-    const data = await response.json();
-    return data.lists || [];
   };
 
   const fetchSelectedAudience = async (): Promise<string> => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/get`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/get`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to fetch selected audience");
+      const data = await response.json();
+      return data.selected_audience_id || "";
     });
-
-    await handleApiError(response, "Failed to fetch selected audience");
-    const data = await response.json();
-    return data.selected_audience_id || "";
   };
 
   const saveSelectedAudience = async (audienceId: string) => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/post`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-        audience_id: audienceId,
-      }),
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/post`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+          audience_id: audienceId,
+        }),
+      });
+
+      await handleApiError(response, "Failed to save selected audience");
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      } else {
+        const text = await response.text();
+        return { message: text };
+      }
     });
-
-    await handleApiError(response, "Failed to save selected audience");
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    } else {
-      const text = await response.text();
-      return { message: text };
-    }
   };
 
   const clearAudienceSelection = async () => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/delete`, {
-      method: "DELETE",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/audience/delete`, {
+        method: "DELETE",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to clear audience selection");
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      } else {
+        const text = await response.text();
+        return { message: text };
+      }
     });
-
-    await handleApiError(response, "Failed to clear audience selection");
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    } else {
-      const text = await response.text();
-      return { message: text };
-    }
   };
 
   const disconnectMailchimp = async () => {
-    const signature = await fetchStripeSignature();
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
 
-    const response = await fetch(`${getBaseUrl()}/oauth/mailchimp/disconnect`, {
-      method: "DELETE",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+      const response = await fetch(`${getBaseUrl()}/oauth/mailchimp/disconnect`, {
+        method: "DELETE",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      await handleApiError(response, "Failed to disconnect Mailchimp");
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      } else {
+        const text = await response.text();
+        return { message: text };
+      }
     });
-
-    await handleApiError(response, "Failed to disconnect Mailchimp");
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    } else {
-      const text = await response.text();
-      return { message: text };
-    }
   };
 
   const getMailchimpAuthUrl = () => {
@@ -265,154 +320,168 @@ export const useApi = (userContext: ExtensionContextValue['userContext']) => {
   };
 
   const completeOnboarding = async () => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/mailchimp/onboarding/complete`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/mailchimp/onboarding/complete`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      if (!response.ok) {
+        await handleApiError(response, "Failed to mark onboarding as complete");
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      } else {
+        const text = await response.text();
+        return { message: text };
+      }
     });
-
-    if (!response.ok) {
-      await handleApiError(response, "Failed to mark onboarding as complete");
-    }
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    } else {
-      const text = await response.text();
-      return { message: text };
-    }
   };
 
   const checkOnboardingStatus = async () => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/mailchimp/onboarding/is-completed`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/mailchimp/onboarding/is-completed`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
+
+      if (!response.ok) {
+        await handleApiError(response, "Failed to check onboarding status");
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      } else {
+        const result = await response.text();
+        return { completed: result === "true" };
+      }
     });
-
-    if (!response.ok) {
-      await handleApiError(response, "Failed to check onboarding status");
-    }
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    } else {
-      const result = await response.text();
-      return { completed: result === "true" };
-    }
   };
 
   const fetchUsage = async () => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/user/usage`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
-    });
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/user/usage`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
 
-    await handleApiError(response, "Failed to fetch usage data");
-    return await response.json();
+      await handleApiError(response, "Failed to fetch usage data");
+      return await response.json();
+    });
   };
 
   const fetchPermissionStatus = async () => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/get`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
-    });
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/get`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
 
-    await handleApiError(response, "Failed to fetch permission status");
-    return await response.json();
+      await handleApiError(response, "Failed to fetch permission status");
+      return await response.json();
+    });
   };
 
   const savePermissionStatus = async (status: string) => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/post`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-        audience_status: status,
-      }),
-    });
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/post`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+          audience_status: status,
+        }),
+      });
 
-    await handleApiError(response, "Failed to save permission status");
-    return await response.json();
+      await handleApiError(response, "Failed to save permission status");
+      return await response.json();
+    });
   };
 
   const clearPermissionStatus = async () => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/delete`, {
-      method: "DELETE",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
-    });
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/status/delete`, {
+        method: "DELETE",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
 
-    await handleApiError(response, "Failed to clear permission status");
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    } else {
-      const text = await response.text();
-      return { message: text };
-    }
+      await handleApiError(response, "Failed to clear permission status");
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+      } else {
+        const text = await response.text();
+        return { message: text };
+      }
+    });
   };
 
   const getPendingContacts = async () => {
-    const signature = await fetchStripeSignature();
-    const response = await fetch(`${getBaseUrl()}/mailchimp/user/get-pending-contacts`, {
-      method: "POST",
-      headers: {
-        "Stripe-Signature": signature,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userContext?.id,
-        account_id: userContext?.account?.id,
-      }),
-    });
+    return withRetry(async () => {
+      const signature = await fetchStripeSignature();
+      const response = await fetch(`${getBaseUrl()}/mailchimp/user/get-pending-contacts`, {
+        method: "POST",
+        headers: {
+          "Stripe-Signature": signature,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userContext?.id,
+          account_id: userContext?.account?.id,
+        }),
+      });
 
-    await handleApiError(response, "Failed to get pending contacts");
-    return await response.json();
+      await handleApiError(response, "Failed to get pending contacts");
+      return await response.json();
+    });
   };
 
   return {

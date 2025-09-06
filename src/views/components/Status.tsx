@@ -48,7 +48,22 @@ export const Status: React.FC<StatusProps> = ({
   getPricingPageUrl,
   accountId
 }) => {
-  const isSyncingActive = isMailchimpConnected && audience && audience !== "" && permissions && permissions !== "";
+  const isSyncingActive = isMailchimpConnected && audience && audience !== "" && permissions && permissions !== "" && planInfo?.planName !== "NONE";
+  const getMailchimpStatusMessage = () => {
+    if (planInfo?.planName === "NONE") {
+      return "Update your subscription";
+    }
+  
+    if (!isMailchimpConnected) {
+      return "Manage Mailchimp to begin syncing.";
+    }
+  
+    if (!audience || !permissions) {
+      return "Manage Audience to begin syncing.";
+    }
+  
+    return "Customers are being synced to Mailchimp.";
+  };
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -100,16 +115,7 @@ export const Status: React.FC<StatusProps> = ({
             )}
           </Box>
           <Inline css={{ }}>
-            { !isMailchimpConnected && 
-              "Manage Mailchimp to begin syncing."
-            }
-            { isMailchimpConnected && (!audience || audience === "" || !permissions || permissions === "") && 
-              "Manage Audience to begin syncing."
-            }
-            {
-              isMailchimpConnected && audience && audience !== "" && permissions && permissions !== "" &&
-              "Customers are being synced to Mailchimp."
-            }
+           { getMailchimpStatusMessage() }
           </Inline>
         </Box>
       </Box>

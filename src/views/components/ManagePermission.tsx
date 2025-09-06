@@ -72,16 +72,13 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
   }, []); // Empty dependency array - only run on mount
 
   const handleSave = async () => {
-    console.log("handleSave - selectedStatusId:", selectedStatusId, "originalStatusId:", originalStatusId);
     setSaveLoading(true);
     try {
       await onSavePermissionStatus(selectedStatusId);
-      console.log("Save successful, updating originalStatusId to:", selectedStatusId);
       // Update originalStatusId immediately after successful save
       setOriginalStatusId(selectedStatusId);
       const selectedStatus = statuses.find(s => s.id === selectedStatusId);
       onShowSuccess("Permissions updated.");
-      console.log("Save complete - new originalStatusId should be:", selectedStatusId);
     } catch (err) {
       console.log("Save failed:", err);
       onError((err as Error).message || "Failed to save status selection");
@@ -91,7 +88,6 @@ export const ManagePermission: React.FC<ManagePermissionProps> = ({
   };
 
   const hasChanges = selectedStatusId !== originalStatusId && selectedStatusId !== "";
-  console.log("hasChanges:", hasChanges, "selectedStatusId:", selectedStatusId, "originalStatusId:", "originalStatusId");
 
   return (
     <Box css={{
